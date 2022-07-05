@@ -21,9 +21,6 @@ public class Spider4VideoStationApp implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         registry.addResourceHandler("/static/**")
             .addResourceLocations("classpath:/static/");
-        File pluginFile = new File("VideoStation插件[解压我].zip");
-        registry.addResourceHandler("/plugin")
-            .addResourceLocations(pluginFile.getAbsolutePath());
     }
     
     public static void main(String[] args) throws Throwable {
