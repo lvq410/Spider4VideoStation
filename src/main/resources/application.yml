@@ -1,0 +1,65 @@
+management:
+  server.port: 33333
+  endpoints:
+    enabled-by-default: true
+    web.exposure.include: "*"
+  endpoint.health.show-details: never
+  health:
+    defaults.enabled: false
+    db.enabled: false
+  info.git.mode: full
+
+server.port: ${management.server.port}
+
+spring:
+  main:
+    banner-mode: "OFF"
+  application.name: Spider4VideoStation
+  boot.admin.client:
+    enabled: false
+    url: http://localhost:25020
+    instance.prefer-ip: true
+    auto-deregistration: true
+
+logging:
+  file: logs/spider4videostation.log
+  file.max-history: 30
+  level:
+    root: info
+#    com.lvt4j.spider4videostation.JavdbController: trace
+
+publishPrefix: http://127.0.0.1:${management.server.port}
+staticUrl: ${publishPrefix}/static
+
+basePrefix: http://127.0.0.1:${management.server.port}
+staticSaveUrl: ${basePrefix}/static/save.html
+
+webDriverAddr: http://127.0.0.1:4444
+webDriverHeadless: true
+webDriverArgs:
+- "--disable-gpu"
+- "--disable-extensions"
+- "--disable-browser-side-navigation"
+- "--disable-dev-shm-usage"
+- "--blink-settings=imagesEnabled=false"
+- "--no-sandbox"
+- "--start-maximized"
+- "--enable-automation"
+
+staticWebDriverArgs:
+- "--disable-gpu"
+- "--disable-extensions"
+- "--disable-browser-side-navigation"
+- "--disable-dev-shm-usage"
+- "--no-sandbox"
+- "--start-maximized"
+- "--enable-automation"
+
+staticLoadTimeoutMillis: 300000
+
+cache.expireInterval: 2592000000  
+
+javdbOrigin: https://javdb36.com
+javdbTouchUrl: ${javdbOrigin}/manifest.json
+javdbTimeoutMillis: 300000
+
