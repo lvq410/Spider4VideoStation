@@ -24,6 +24,11 @@ public class Spider4VideoStationApp implements WebMvcConfigurer {
         File pluginFile = new File("VideoStation插件[解压我].zip");
         registry.addResourceHandler("/plugin")
             .addResourceLocations(pluginFile.getAbsolutePath());
+        
+        registry.addResourceHandler("/hls-f2e/**")
+            .addResourceLocations(new File("C:\\Users\\chanceylee\\Desktop\\html\\").toURI().toString());
+        registry.addResourceHandler("/hls-media/**")
+            .addResourceLocations(new File("C:\\Users\\chanceylee\\Desktop\\media\\").toURI().toString());
     }
     
     public static void main(String[] args) throws Throwable {
