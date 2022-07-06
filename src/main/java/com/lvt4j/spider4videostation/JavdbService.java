@@ -20,11 +20,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.openqa.selenium.By;
 import org.openqa.selenium.Cookie;
-import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -291,14 +288,6 @@ public class JavdbService implements SpiderService {
             throw new RuntimeException("err on web load", e);
         });
         
-        try{
-            WebElement over18A = webDriver.findElement(By.cssSelector("div.over18-modal a.is-success"));
-            if(over18A.isDisplayed()) {
-                if(log.isTraceEnabled()) log.trace("over18 is displaying , try click it");
-                over18A.click();
-            }
-        }catch(NoSuchElementException ig){}
-        
         String cnt = webDriver.getPageSource();
         
         if(url.equals(webDriver.getCurrentUrl())) cacher.saveAsStr(url, cnt);
@@ -323,6 +312,7 @@ public class JavdbService implements SpiderService {
             .pageLoadTimeout(config.getJavdbTimeoutMillis(), TimeUnit.MILLISECONDS)
             .setScriptTimeout(config.getJavdbTimeoutMillis(), TimeUnit.MILLISECONDS);
         
+        if(log.isTraceEnabled()) log.trace("open javdb touchUrl : {}", config.getJavdbTouchUrl());
         webDriver.get(config.getJavdbTouchUrl());
         
         Date cookieExpire = new Date(System.currentTimeMillis()+365*24*60*60*1000);
@@ -334,7 +324,7 @@ public class JavdbService implements SpiderService {
         return webDriver;
     }
     
-    @Scheduled(cron="0/5 * * * * ?")
+    @Scheduled(cron="0 * * * * ?")
     public synchronized void driverKeepAlive() {
         if(webDriver==null) return;
         if(System.currentTimeMillis()-latestWebDriverTouchTime<Consts.WebDriverHeartbeatGap) return;
