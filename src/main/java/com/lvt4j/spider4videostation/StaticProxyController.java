@@ -1,7 +1,6 @@
 package com.lvt4j.spider4videostation;
 
 import java.net.URL;
-import java.util.Base64;
 import java.util.concurrent.TimeUnit;
 
 import javax.annotation.PreDestroy;
@@ -9,7 +8,6 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
-import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,19 +16,16 @@ import org.springframework.http.MediaType;
 import org.springframework.http.MediaTypeFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 /**
- *
+ * 没有较强防抓包的静态资源网站的资源下载
  * @author LV on 2022年7月2日
  */
 @Slf4j
@@ -42,6 +37,9 @@ public class StaticProxyController {
     private Config config;
     @Autowired
     private FileCacher cacher;
+    
+    @Autowired
+    private StaticService service;
     
     private RemoteWebDriver webDriver;
     private long latestWebDriverTouchTime;
@@ -61,33 +59,18 @@ public class StaticProxyController {
     @GetMapping
     public void proxy(HttpServletResponse response,
             @RequestParam String url) throws Throwable {
-        byte[] bs = cacher.loadCache(url);
+        byte[] bs = cacher.load(url);
         if(bs!=null){
             responseData(url, bs, response);
             return;
         }
         
-        String saveUrl = UriComponentsBuilder.fromHttpUrl(config.getStaticSaveUrl())
-            .queryParam("url", url)
-            .build().toUriString();
-        
-        synchronized (this) {
-            Utils.retry(()->{
-                driver().get(saveUrl);
-            }, (e, n)->{
-                log.error("err on web load {}", url, e);
-                destory();
-                if(n==1) return true;
-                throw new RuntimeException("err on web load", e);
-            });
-            
-            long waitedTime = 0;
-            while(bs==null && waitedTime<config.getStaticLoadTimeoutMillis()){
-                Thread.sleep(100);
-                waitedTime += 100;
-                bs = cacher.loadCache(url);
-            }
+        synchronized(this){
+            service.downAsCache(driver(), url);
         }
+        
+        Utils.waitUntil(()->cacher.exist(url), config.getStaticLoadTimeoutMillis());
+        bs = cacher.load(url);
         
         if(bs!=null){
             responseData(url, bs, response);
@@ -97,7 +80,7 @@ public class StaticProxyController {
         }
     }
     @SneakyThrows
-    private synchronized WebDriver driver() {
+    private synchronized RemoteWebDriver driver() {
         if(webDriver!=null) {
             latestWebDriverTouchTime = System.currentTimeMillis();
             return webDriver;
@@ -123,7 +106,7 @@ public class StaticProxyController {
         response.setContentLength(bs.length);
         IOUtils.write(bs, response.getOutputStream());
     }
-    @Scheduled(cron="0/5 * * * * ?")
+    @Scheduled(cron="0 * * * * ?")
     public synchronized void driverKeepAlive() {
         if(webDriver==null) return;
         if(System.currentTimeMillis()-latestWebDriverTouchTime<Consts.WebDriverHeartbeatGap) return;
@@ -132,12 +115,4 @@ public class StaticProxyController {
         latestWebDriverTouchTime = System.currentTimeMillis();
     }
     
-    @PostMapping("saveAs64")
-    public void saveAs64(
-            @RequestParam String url,
-            @RequestBody String b64) {
-        byte[] bs = Base64.getDecoder().decode(b64);
-        log.info("cache static {} {}", url, bs.length);
-        cacher.saveCache(url, bs);
-    }
 }

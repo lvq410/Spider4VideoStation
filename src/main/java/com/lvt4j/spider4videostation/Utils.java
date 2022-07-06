@@ -2,6 +2,8 @@ package com.lvt4j.spider4videostation;
 
 import static com.lvt4j.spider4videostation.Consts.AvIdPattern;
 
+import java.io.File;
+import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -12,10 +14,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import lombok.extern.slf4j.Slf4j;
+
 /**
  *
  * @author LV on 2022年6月30日
  */
+@Slf4j
 public class Utils {
 
     static ObjectMapper ObjectMapper = new ObjectMapper();
@@ -81,4 +86,27 @@ public class Utils {
         void run() throws Throwable;
     }
 
+    public static boolean waitUntil(Supplier<Boolean> until, long timeout) throws InterruptedException {
+        long waitedTime = 0;
+        while(!until.get()){
+            if(timeout>0 && waitedTime>=timeout) break;
+            Thread.sleep(10);
+            waitedTime += 10;
+        }
+        return until.get();
+    }
+    
+    public static void waitFileNoChange(File file, long timeout) throws InterruptedException {
+        long waitedTime = 0;
+        long lastPeekModify, lastPeekLength;
+        do{
+            if(timeout>0 && waitedTime>=timeout) break;
+            lastPeekModify = file.lastModified();
+            lastPeekLength = file.length();
+            if(log.isTraceEnabled()) log.trace("waiting file stop change {} lastModified：{} length：{}", file.getAbsolutePath(), lastPeekModify, lastPeekLength);
+            Thread.sleep(100);
+            waitedTime += 100;
+        }while(lastPeekModify!=file.lastModified() || lastPeekLength!=file.length());
+    }
+    
 }

@@ -279,7 +279,7 @@ public class JavdbService implements SpiderService {
     
     @SneakyThrows
     private synchronized String loadPage(String url) {
-        String cached = cacher.loadCacheAsStr(url);
+        String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
         
         Utils.retry(()->{
@@ -301,7 +301,7 @@ public class JavdbService implements SpiderService {
         
         String cnt = webDriver.getPageSource();
         
-        if(url.equals(webDriver.getCurrentUrl())) cacher.saveCacheAsStr(url, cnt);
+        if(url.equals(webDriver.getCurrentUrl())) cacher.saveAsStr(url, cnt);
         
         return cnt;
     }
