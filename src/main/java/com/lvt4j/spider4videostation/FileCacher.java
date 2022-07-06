@@ -3,8 +3,6 @@ package com.lvt4j.spider4videostation;
 import java.io.File;
 import java.net.URL;
 
-import javax.annotation.PostConstruct;
-
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -12,11 +10,13 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import lombok.SneakyThrows;
+import lombok.extern.slf4j.Slf4j;
 
 /**
  *
  * @author LV on 2022年7月2日
  */
+@Slf4j
 @Service
 public class FileCacher {
 
@@ -29,37 +29,49 @@ public class FileCacher {
         rootFolder.mkdirs();
     }
     
-    @PostConstruct
-    private void init() {
+    public boolean exist(String url) {
+        return exist(cacheFile(url));
+    }
+    private boolean exist(File cacheFile) {
+        if(!cacheFile.exists()) return false;
+        if(System.currentTimeMillis()-cacheFile.lastModified()>expireInterval){
+            cacheFile.delete();
+            return false;
+        }
+        return true;
     }
     
     @SneakyThrows
-    public String loadCacheAsStr(String url) {
-        byte[] cnt = loadCache(url);
+    public String loadAsStr(String url) {
+        byte[] cnt = load(url);
         if(cnt==null) return null;
         return new String(cnt);
     }
     
     @SneakyThrows
-    public byte[] loadCache(String url) {
+    public byte[] load(String url) {
         File cacheFile = cacheFile(url);
-        if(!cacheFile.exists()) return null;
-        
-        if(System.currentTimeMillis()-cacheFile.lastModified()>expireInterval){
-            cacheFile.delete();
-            return null;
-        }
+        if(!exist(cacheFile)) return null;
         
         return FileUtils.readFileToByteArray(cacheFile);
     }
     
     @SneakyThrows
-    public void saveCacheAsStr(String url, String cnt) {
-        saveCache(url, cnt.getBytes());
+    public void saveAsStr(String url, String cnt) {
+        save(url, cnt.getBytes());
     }
     @SneakyThrows
-    public void saveCache(String url, byte[] cnt) {
-        FileUtils.writeByteArrayToFile(cacheFile(url), cnt);
+    public void save(String url, byte[] cnt) {
+        File cacheFile = cacheFile(url);
+        FileUtils.deleteQuietly(cacheFile);
+        FileUtils.writeByteArrayToFile(cacheFile, cnt);
+    }
+    @SneakyThrows
+    public void save(String url, File origFile) {
+        if(log.isTraceEnabled()) log.trace("save cache {}", url);
+        File cacheFile = cacheFile(url);
+        FileUtils.deleteQuietly(cacheFile);
+        origFile.renameTo(cacheFile);
     }
     
     @SneakyThrows

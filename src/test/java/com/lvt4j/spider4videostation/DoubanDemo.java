@@ -31,22 +31,6 @@ public class DoubanDemo {
         
         RemoteWebDriver webDriver = new RemoteWebDriver(new URL("http://127.0.0.1:4444"), options);
         
-        System.out.println("打开图片页");
-        webDriver.get("https://img9.doubanio.com/view/photo/s_ratio_poster/public/p940263436.webp");
-        
-        System.out.println("发送下载图片脚本？");
-        System.in.read();
-        String script = "var body = document.getElementsByTagName('body')[0];\n" + 
-            "var a = document.createElement(\"a\");\n" + 
-            "a.setAttribute(\"href\", \"https://img9.doubanio.com/view/photo/s_ratio_poster/public/p940263436.webp\");\n" + 
-            "a.setAttribute(\"download\", \"aaaa.jpg\");\n" + 
-            "body.appendChild(a);\n" + 
-            "a.click();";
-        webDriver.executeScript(script);
-        
-        System.in.read();
-        
-        
         System.out.println("打开登录页");
         webDriver.get("https://accounts.douban.com/passport/login");
         

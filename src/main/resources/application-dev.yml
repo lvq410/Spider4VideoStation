@@ -1,0 +1,12 @@
+spring:
+  boot.admin.client:
+    enabled: true
+
+logging:
+  file:
+  level:
+    com.lvt4j.spider4videostation: trace
+
+webDriverHeadless: false
+
+staticChromeDownloadFolder: E:\Download\Spider4VideoStationStatic

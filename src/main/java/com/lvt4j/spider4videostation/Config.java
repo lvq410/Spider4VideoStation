@@ -24,15 +24,13 @@ public class Config {
     public String publishPrefix;
     public String staticUrl;
     
-    public String basePrefix;
-    public String staticSaveUrl;
-    
     public String webDriverAddr;
     public boolean webDriverHeadless;
     public List<String> webDriverArgs;
+
     public List<String> staticWebDriverArgs;
-    
     public long staticLoadTimeoutMillis;
+    public String staticChromeDownloadFolder;
     
     public String javdbOrigin;
     public String javdbTouchUrl;
