@@ -27,9 +27,6 @@ logging:
   level:
     root: info
 
-publishPrefix: http://127.0.0.1:${management.server.port}
-staticUrl: ${publishPrefix}/static
-
 webDriverAddr: http://127.0.0.1:4444
 webDriverHeadless: true
 webDriverArgs:
@@ -55,8 +52,25 @@ staticLoadTimeoutMillis: 300000
 
 staticChromeDownloadFolder: /home/seluser/Downloads
 
-cache.expireInterval: 2592000000  
+cacheMaxSize: 1073741824
+cacheExpireDuration: 2592000000  
 
 javdbOrigin: https://javdb36.com
 javdbTouchUrl: ${javdbOrigin}/manifest.json
 javdbTimeoutMillis: 300000
+
+doubanDomain: douban.com
+doubanOrigin: https://${doubanDomain}
+doubanTouchUrl: ${doubanOrigin}/robots.txt
+doubanSearchDomain: search.${doubanDomain}
+doubanSearchMovieUrl: https://${doubanSearchDomain}/movie/subject_search
+doubanMovieDomain: movie.${doubanDomain}
+doubanMovieOrigin: https://${doubanMovieDomain}
+doubanMovieItemPatterm: https://${doubanMovieDomain}/subject
+doubanLoginWaitTimeoutMillis: 60000
+doubanLoginCheckableDomain:
+- ${doubanSearchDomain}
+- ${doubanMovieDomain}
+doubanLoginCheckUrl: ${doubanMovieOrigin}
+doubanLoginUrl: https://accounts.${doubanDomain}/passport/login
+doubanTimeoutMillis: 10000

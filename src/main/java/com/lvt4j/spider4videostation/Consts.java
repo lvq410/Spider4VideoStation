@@ -1,5 +1,6 @@
 package com.lvt4j.spider4videostation;
 
+import java.io.File;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -13,8 +14,19 @@ public class Consts {
     public static final String PluginTestUseTitle = "special_test_title_4_com.lvt4j.spider4videostation";
 
     public static final String PluginIdPrefix = "com.lvt4j.Spider4VideoStation";
+
+    public static final String ChromeArg_Headless = "--headless";
+    public static final String ChromeArg_NoImage = "--blink-settings=imagesEnabled=false";
     
-//    public static final long WebDriverHeartbeatGap = TimeUnit.MINUTES.toMillis(5L);
-    public static final long WebDriverHeartbeatGap = TimeUnit.SECONDS.toMillis(10L);
+    public static final File Folder_Cache = new File("cache");
+    public static final File Folder_Cookies = new File("cookies");
+    
+    static{
+        Folder_Cache.mkdirs();
+        Folder_Cookies.mkdirs();
+    }
+    
+    public static final long WebDriverHeartbeatGap = TimeUnit.MINUTES.toMillis(1L);
+//    public static final long WebDriverHeartbeatGap = TimeUnit.SECONDS.toMillis(10L);
     
 }

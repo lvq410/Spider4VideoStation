@@ -1,4 +1,4 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.pojo;
 
 import java.util.Collections;
 import java.util.LinkedList;

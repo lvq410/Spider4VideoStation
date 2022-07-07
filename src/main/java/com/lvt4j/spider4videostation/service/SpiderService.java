@@ -1,4 +1,8 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.service;
+
+import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.pojo.Args;
+import com.lvt4j.spider4videostation.pojo.Rst;
 
 /**
  *
@@ -11,11 +15,8 @@ public interface SpiderService {
     /**
      * 实现时注意：
      * 加载完一个数据后 执行rst.result.add(xxx) 进行填充
-     * @param request
-     * @param args
-     * @param rst
      */
-    public void search(Plugin plugin,
+    public void search(String publishPrefix, Plugin plugin,
         Args args, Rst rst);
     
 }

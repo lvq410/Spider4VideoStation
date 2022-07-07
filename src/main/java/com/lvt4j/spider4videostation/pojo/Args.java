@@ -1,4 +1,4 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.pojo;
 
 import static com.lvt4j.spider4videostation.Utils.ObjectMapper;
 
@@ -28,6 +28,14 @@ public class Args {
     
     public static class Input {
         public String title;
+        public String original_available;
+        
+        public String year() {
+            if(StringUtils.isBlank(original_available)) return null;
+            String[] splits = original_available.split("-");
+            if(splits.length==0) return null;
+            return splits[0];
+        }
     }
     
     public static Args parse(String args) {
@@ -50,6 +58,7 @@ public class Args {
                 case "--input ":
                     parsed.input = ObjectMapper.readValue(value, Input.class);
                     parsed.input.title = StringUtils.trim(parsed.input.title);
+                    parsed.input.original_available = StringUtils.trim(parsed.input.original_available);
                     Validate.notBlank(parsed.input.title, "关键词条件不能为空");
                     break;
                 case "--limit ":

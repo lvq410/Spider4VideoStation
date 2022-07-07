@@ -1,13 +1,22 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.service;
+
+import static com.lvt4j.spider4videostation.Consts.Folder_Cache;
 
 import java.io.File;
 import java.net.URL;
+import java.util.LinkedList;
+import java.util.List;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jmx.export.annotation.ManagedOperation;
+import org.springframework.jmx.export.annotation.ManagedResource;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import com.lvt4j.spider4videostation.Config;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -18,23 +27,18 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
+@ManagedResource(objectName="!cache:type=FileCacher")
 public class FileCacher {
 
-    @Value("${cache.expireInterval:3600000}")
-    private long expireInterval;
-    
-    private static File rootFolder = new File("cache");
-    
-    static {
-        rootFolder.mkdirs();
-    }
+    @Autowired
+    private Config config;
     
     public boolean exist(String url) {
         return exist(cacheFile(url));
     }
     private boolean exist(File cacheFile) {
         if(!cacheFile.exists()) return false;
-        if(System.currentTimeMillis()-cacheFile.lastModified()>expireInterval){
+        if(System.currentTimeMillis()-cacheFile.lastModified()>config.getCacheExpireDuration()){
             cacheFile.delete();
             return false;
         }
@@ -62,6 +66,7 @@ public class FileCacher {
     }
     @SneakyThrows
     public void save(String url, byte[] cnt) {
+        if(log.isTraceEnabled()) log.trace("save cache {}", url);
         File cacheFile = cacheFile(url);
         FileUtils.deleteQuietly(cacheFile);
         FileUtils.writeByteArrayToFile(cacheFile, cnt);
@@ -79,11 +84,12 @@ public class FileCacher {
         URL u = new URL(url);
         String domain = u.getHost();
         
-        File domainFolder = new File(rootFolder, domain);
+        File domainFolder = new File(Folder_Cache, domain);
         domainFolder.mkdirs();
         
         String path = u.getPath();
         while(path.startsWith("/")) path = path.substring(1);
+        if(path.endsWith("/")) path += ".cache";
         
         File ctxFolder = new File(domainFolder, path).getParentFile(); ctxFolder.mkdirs();
        
@@ -95,9 +101,38 @@ public class FileCacher {
                 .replaceAll("[\\?]", "？").replaceAll("[\\\"]", "＂").replaceAll("[<]", "＜")
                 .replaceAll("[>]", "＞").replaceAll("[|]", "｜");
         
-        name += ".cache";
+        if(!name.endsWith(".cache")) name += ".cache";
         
         return new File(ctxFolder, name);
+    }
+    
+    @ManagedOperation
+    @Scheduled(cron="0 0 0 * * ?")
+    public void scheduleClean() {
+        if(config.getCacheMaxSize()<=0) return;
+        List<File> all = new LinkedList<>();
+        listFolderFiles(all, Folder_Cache);
+        all.sort((f1,f2)->Long.compare(f1.lastModified(), f2.lastModified()));
+        long size = all.stream().map(f->f.length()).reduce(0L, (a,b)->a+b);
+        while(size>config.getCacheMaxSize() && all.size()>0){
+            File file = all.remove(0);
+            size -= file.length();
+            deleteFileParently(file);
+        }
+    }
+    private void deleteFileParently(File file) {
+        file.delete();
+        File folder = file.getParentFile();
+        if(folder.list().length==0) deleteFileParently(folder);
+    }
+    private void listFolderFiles(List<File> rsts, File folder) {
+        for(File file : folder.listFiles()){
+            if(file.isDirectory()){
+                listFolderFiles(rsts, file);
+            }else{
+                rsts.add(file);
+            }
+        }
     }
     
 }

@@ -24,5 +24,6 @@ applicationPid
 /test/
 /logs/
 /cache/
+/cookies/
 *.log
 application.pid

@@ -3,7 +3,6 @@ spring:
     enabled: true
 
 logging:
-  file:
   level:
     com.lvt4j.spider4videostation: trace
 

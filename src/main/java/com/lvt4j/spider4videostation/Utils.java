@@ -3,6 +3,7 @@ package com.lvt4j.spider4videostation;
 import static com.lvt4j.spider4videostation.Consts.AvIdPattern;
 
 import java.io.File;
+import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -23,7 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class Utils {
 
-    static ObjectMapper ObjectMapper = new ObjectMapper();
+    public static ObjectMapper ObjectMapper = new ObjectMapper();
     static {
         ObjectMapper.setSerializationInclusion(Include.NON_NULL);
         ObjectMapper.enable(DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS);
@@ -86,26 +87,26 @@ public class Utils {
         void run() throws Throwable;
     }
 
-    public static boolean waitUntil(Supplier<Boolean> until, long timeout) throws InterruptedException {
-        long waitedTime = 0;
+    public static boolean waitUntil(Supplier<Boolean> until, long timeout) throws InterruptedException,TimeoutException {
+        long beginTime = System.currentTimeMillis(), waitedTime = 0;
         while(!until.get()){
-            if(timeout>0 && waitedTime>=timeout) break;
+            if(timeout>0 && waitedTime>=timeout) throw new TimeoutException(String.format("wait timeout %s > %s", waitedTime, timeout));
             Thread.sleep(10);
-            waitedTime += 10;
+            waitedTime = System.currentTimeMillis()-beginTime;
         }
         return until.get();
     }
     
-    public static void waitFileNoChange(File file, long timeout) throws InterruptedException {
-        long waitedTime = 0;
+    public static void waitFileNoChange(File file, long timeout) throws InterruptedException, TimeoutException {
+        long beginTime = System.currentTimeMillis(), waitedTime = 0;
         long lastPeekModify, lastPeekLength;
         do{
-            if(timeout>0 && waitedTime>=timeout) break;
+            if(timeout>0 && waitedTime>=timeout) throw new TimeoutException(String.format("wait timeout %s > %s", waitedTime, timeout));
             lastPeekModify = file.lastModified();
             lastPeekLength = file.length();
             if(log.isTraceEnabled()) log.trace("waiting file stop change {} lastModified：{} length：{}", file.getAbsolutePath(), lastPeekModify, lastPeekLength);
             Thread.sleep(100);
-            waitedTime += 100;
+            waitedTime = System.currentTimeMillis()-beginTime;
         }while(lastPeekModify!=file.lastModified() || lastPeekLength!=file.length());
     }
     

@@ -1,12 +1,13 @@
 package com.lvt4j.spider4videostation;
 
+import static com.lvt4j.spider4videostation.Consts.ChromeArg_Headless;
+
 import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import lombok.Getter;
 import lombok.Setter;
@@ -21,35 +22,46 @@ import lombok.Setter;
 @ConfigurationProperties
 public class Config {
 
-    public String publishPrefix;
-    public String staticUrl;
-    
-    public String webDriverAddr;
-    public boolean webDriverHeadless;
-    public List<String> webDriverArgs;
+    private String webDriverAddr;
+    private boolean webDriverHeadless;
+    private List<String> webDriverArgs;
 
-    public List<String> staticWebDriverArgs;
-    public long staticLoadTimeoutMillis;
-    public String staticChromeDownloadFolder;
+    private List<String> staticWebDriverArgs;
+    private long staticLoadTimeoutMillis;
+    private String staticChromeDownloadFolder;
     
-    public String javdbOrigin;
-    public String javdbTouchUrl;
-    public int javdbTimeoutMillis;
+    private long cacheMaxSize;
+    private long cacheExpireDuration;
+    
+    private String javdbOrigin;
+    private String javdbTouchUrl;
+    private int javdbTimeoutMillis;
+    
+    private String doubanDomain;
+    private String doubanOrigin;
+    private String doubanTouchUrl;
+    private String doubanSearchDomain;
+    private String doubanSearchMovieUrl;
+    private String doubanMovieDomain;
+    private String doubanMovieOrigin;
+    private String doubanMovieItemPatterm;
+    private long doubanLoginWaitTimeoutMillis;
+    private List<String> doubanLoginCheckableDomain;
+    private String doubanLoginCheckUrl;
+    private String doubanLoginUrl;
+    private long doubanTimeoutMillis;
+    
+    
     
     public List<String> getWebDriverArgs() {
         List<String> webDriverArgs = new ArrayList<>(this.webDriverArgs);
-        if(webDriverHeadless) webDriverArgs.add("--headless");
+        if(webDriverHeadless) webDriverArgs.add(ChromeArg_Headless);
         return webDriverArgs;
     }
     public List<String> getStaticWebDriverArgs() {
         List<String> staticWebDriverArgs = new ArrayList<>(this.staticWebDriverArgs);
-        if(webDriverHeadless) staticWebDriverArgs.add("--headless");
+        if(webDriverHeadless) staticWebDriverArgs.add(ChromeArg_Headless);
         return staticWebDriverArgs;
-    }
-    
-    public String staticWrap(String url) {
-        return UriComponentsBuilder.fromHttpUrl(staticUrl)
-            .queryParam("url", url).toUriString();
     }
     
 }

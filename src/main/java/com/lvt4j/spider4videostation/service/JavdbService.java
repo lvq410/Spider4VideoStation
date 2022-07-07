@@ -1,4 +1,4 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.service;
 
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 
@@ -21,12 +21,23 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.Cookie;
+import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+
+import com.lvt4j.spider4videostation.Config;
+import com.lvt4j.spider4videostation.Consts;
+import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.Utils;
+import com.lvt4j.spider4videostation.controller.StaticController;
+import com.lvt4j.spider4videostation.pojo.Args;
+import com.lvt4j.spider4videostation.pojo.Movie;
+import com.lvt4j.spider4videostation.pojo.Rst;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -46,6 +57,9 @@ public class JavdbService implements SpiderService {
     
     @Autowired
     private FileCacher cacher;
+    
+    @Autowired@Lazy
+    private StaticController staticController;
     
     private RemoteWebDriver webDriver;
     private long latestWebDriverTouchTime;
@@ -71,7 +85,7 @@ public class JavdbService implements SpiderService {
     }
     
     @Override
-    public void search(Plugin plugin, Args args, Rst rst) {
+    public void search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
         boolean strictAvId = Plugin.AV_StrictId==plugin;
         
         String title = args.input.title;
@@ -85,7 +99,7 @@ public class JavdbService implements SpiderService {
         }catch(Exception ig){ return;}
         
         try{
-            listCnt = loadPage(listUrl.toString());
+            listCnt = loadPage(listUrl);
             if(log.isTraceEnabled()) log.trace("load list cnt {}", listCnt);
         }catch(Exception e){
             log.error("error load list {}", listUrl, e);
@@ -93,7 +107,7 @@ public class JavdbService implements SpiderService {
         }
         
         Document listHtml = Jsoup.parse(listCnt);
-        listHtml.setBaseUri(listUrl.toString());
+        listHtml.setBaseUri(listUrl);
         Elements items = listHtml.select(".container .movie-list .item");
         
         int rstNum = 0;
@@ -116,7 +130,7 @@ public class JavdbService implements SpiderService {
             
             Movie movie = null;
             try{
-                movie = loadItem(plugin, detailUrl);
+                movie = loadItem(publishPrefix, plugin, detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -128,7 +142,7 @@ public class JavdbService implements SpiderService {
             if(coverImg!=null){
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = config.staticWrap(coverUrl);
+                    coverUrl = staticController.staticWrap(publishPrefix, coverUrl);
                 }
             }
             
@@ -155,7 +169,7 @@ public class JavdbService implements SpiderService {
         }
     }
     
-    private Movie loadItem(Plugin plugin, String detailUrl) throws Exception {
+    private Movie loadItem(String publishPrefix, Plugin plugin, String detailUrl) throws Exception {
         Movie movie = new Movie(plugin.id);
         
         log.info("load detail {}", detailUrl);
@@ -176,7 +190,7 @@ public class JavdbService implements SpiderService {
         if(coverImg!=null) {
             coverUrl = coverImg.absUrl("src");
             if(StringUtils.isNotBlank(coverUrl)){
-                coverUrl = config.staticWrap(coverUrl);
+                coverUrl = staticController.staticWrap(publishPrefix, coverUrl);
                 movie.extra().poster.add(coverUrl);
             }
         }
@@ -192,6 +206,7 @@ public class JavdbService implements SpiderService {
             if(valueDiv==null) continue;
             
             String name = nameStrong.text().trim();
+            if(StringUtils.isBlank(name)) continue;
             
             switch(name){
             case "番號:":
@@ -250,7 +265,7 @@ public class JavdbService implements SpiderService {
         for(Element previewA : previewAs){
             String previewUrl = previewA.absUrl("href");
             if(StringUtils.isBlank(previewUrl)) continue;
-            previewUrl = config.staticWrap(previewUrl);
+            previewUrl = staticController.staticWrap(publishPrefix, previewUrl);
             movie.extra().backdrop.add(previewUrl);
         }
         if(previewAs.isEmpty()){ //无预览图时，用回大封面做背景图
@@ -303,6 +318,7 @@ public class JavdbService implements SpiderService {
         }
         
         ChromeOptions options = new ChromeOptions();
+        options.setPageLoadStrategy(PageLoadStrategy.EAGER);
         options.addArguments(config.getWebDriverArgs());
         
         log.info("init webdriver {}", config.getWebDriverAddr());
@@ -324,7 +340,7 @@ public class JavdbService implements SpiderService {
         return webDriver;
     }
     
-    @Scheduled(cron="0 * * * * ?")
+    @Scheduled(cron="0/30 * * * * ?")
     public synchronized void driverKeepAlive() {
         if(webDriver==null) return;
         if(System.currentTimeMillis()-latestWebDriverTouchTime<Consts.WebDriverHeartbeatGap) return;

@@ -1,4 +1,4 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.controller;
 
 import static com.lvt4j.spider4videostation.Consts.PluginTestUseTitle;
 
@@ -10,6 +10,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.Utils;
+import com.lvt4j.spider4videostation.pojo.Args;
+import com.lvt4j.spider4videostation.pojo.Movie;
+import com.lvt4j.spider4videostation.pojo.Rst;
+import com.lvt4j.spider4videostation.service.SpiderService;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -26,7 +33,9 @@ public class SearchController {
     private List<SpiderService> services;
     
     @PostMapping
-    public Rst search(@RequestParam String pluginId,
+    public Rst search(
+            @RequestParam String publishPrefix,
+            @RequestParam String pluginId,
             @RequestBody String body) throws Throwable {
         log.info("search {}", body);
         
@@ -53,7 +62,7 @@ public class SearchController {
         }
         
         services.stream().filter(s->s.support(plugin, args)).parallel()
-            .forEach(s->s.search(plugin, args, rst));
+            .forEach(s->s.search(publishPrefix, plugin, args, rst));
         
         rst.success = !rst.result.isEmpty();
         

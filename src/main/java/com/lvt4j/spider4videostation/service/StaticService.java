@@ -1,19 +1,20 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.service;
 
 import static org.springframework.http.HttpStatus.INTERNAL_SERVER_ERROR;
 
 import java.io.File;
-import java.net.URL;
-import java.net.URLDecoder;
 import java.util.stream.Stream;
 
+import javax.annotation.PostConstruct;
+
 import org.apache.commons.io.FileUtils;
-import org.apache.commons.io.FilenameUtils;
-import org.apache.commons.lang3.StringUtils;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
+
+import com.lvt4j.spider4videostation.Config;
+import com.lvt4j.spider4videostation.Utils;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -39,33 +40,51 @@ public class StaticService {
     @Autowired
     private FileCacher cacher;
     
+    private File folder;
+    
+    @PostConstruct
+    private void init() {
+        folder = new File(config.getStaticChromeDownloadFolder());
+    }
+    
     @SneakyThrows
     public synchronized void downAsCache(RemoteWebDriver webDriver, String url) {
-        File folder = new File(config.getStaticChromeDownloadFolder());
-        if(log.isTraceEnabled()) log.trace("clean down folder {}", folder.getAbsolutePath());
-        FileUtils.cleanDirectory(folder);
-        
         log.info("down static {}", url);
         if(log.isTraceEnabled()) log.trace("open {}", url);
         webDriver.get(url);
+        
+        File downFile = sendScriptAndWaitFile(webDriver);
+        
+        cacher.save(url, downFile);
+    }
+    
+    @SneakyThrows
+    public synchronized byte[] downCurAsBs(RemoteWebDriver webDriver) {
+        String url = webDriver.getCurrentUrl();
+        log.info("down static {}", url);
+        
+        File downFile = sendScriptAndWaitFile(webDriver);
+        
+        byte[] bs = FileUtils.readFileToByteArray(downFile);
+        
+        return bs;
+    }
+    
+    @SneakyThrows
+    private File sendScriptAndWaitFile(RemoteWebDriver webDriver) {
+        if(log.isTraceEnabled()) log.trace("clean down folder {}", folder.getAbsolutePath());
+        FileUtils.cleanDirectory(folder);
+        
+        String url = webDriver.getCurrentUrl();
         
         String script = TplScript.replace("@@OrigUrl@@", url);
         if(log.isTraceEnabled()) log.trace("send down script ：{}", script);
         webDriver.executeScript(script);
         
         if(log.isTraceEnabled()) log.trace("waiting file appear in down folder {}", folder.getAbsolutePath());
-        Utils.waitUntil(()->validDownFileCount(folder)>0, config.getStaticLoadTimeoutMillis());
+        Utils.waitUntil(()->validDownFileCount(folder)==1, config.getStaticLoadTimeoutMillis());
         
-        File downFile = null;
-        if(folder.list().length==1){ //下载文件夹中只有一个文件时，则其必然刚好是刚下载的文件
-            downFile = folder.listFiles()[0];
-        }else{ //有多个文件时，尝试根据文件名寻找
-            String downFileNameInUrl = FilenameUtils.getName(new URL(url).getPath());
-            if(StringUtils.isNotBlank(downFileNameInUrl)){
-                downFileNameInUrl = URLDecoder.decode(downFileNameInUrl, "utf8");
-            }
-            downFile = new File(folder, downFileNameInUrl);
-        }
+        File downFile = folder.listFiles()[0];
         if(log.isTraceEnabled()) log.trace("down file {} exist：{}", downFile.getAbsolutePath(), downFile.exists());
         
         if(!downFile.exists())
@@ -73,7 +92,7 @@ public class StaticService {
         
         Utils.waitFileNoChange(downFile, config.getStaticLoadTimeoutMillis());
         
-        cacher.save(url, downFile);
+        return downFile;
     }
     
     private long validDownFileCount(File folder) {

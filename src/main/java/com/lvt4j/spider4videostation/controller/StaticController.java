@@ -1,4 +1,4 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.controller;
 
 import java.net.URL;
 import java.util.concurrent.TimeUnit;
@@ -8,6 +8,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
+import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +21,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import com.lvt4j.spider4videostation.Config;
+import com.lvt4j.spider4videostation.Consts;
+import com.lvt4j.spider4videostation.Utils;
+import com.lvt4j.spider4videostation.service.FileCacher;
+import com.lvt4j.spider4videostation.service.StaticService;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -31,7 +39,7 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 @RestController("static")
 @RequestMapping("static")
-public class StaticProxyController {
+public class StaticController {
 
     @Autowired
     private Config config;
@@ -87,6 +95,7 @@ public class StaticProxyController {
         }
         
         ChromeOptions options = new ChromeOptions();
+        options.setPageLoadStrategy(PageLoadStrategy.EAGER);
         options.addArguments(config.getStaticWebDriverArgs());
         
         log.info("init webdriver {}", config.getWebDriverAddr());
@@ -113,6 +122,12 @@ public class StaticProxyController {
         if(log.isTraceEnabled()) log.trace("webdriver heartbeat");
         webDriver.executeScript("console.log('heartbeat')");
         latestWebDriverTouchTime = System.currentTimeMillis();
+    }
+    
+    public String staticWrap(String publishPrefix, String url) {
+        return UriComponentsBuilder.fromHttpUrl(publishPrefix)
+            .path("static")
+            .queryParam("url", url).toUriString();
     }
     
 }

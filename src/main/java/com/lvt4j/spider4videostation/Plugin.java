@@ -16,6 +16,8 @@ public enum Plugin{
     
     AV_StrictId(PluginIdPrefix+".AV.StrictId", asList("movie"), asList("jpn"))
     ,AV_Normal(PluginIdPrefix+".AV.Normal", asList("movie"), asList("jpn"))
+    
+    ,Douban(PluginIdPrefix+".Douban", asList("movie"), asList("chs"))
     ;
     
     public final String id;

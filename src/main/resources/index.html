@@ -1,0 +1,102 @@
+<html lang="zh-cn">
+    <head>
+        <meta charset="utf-8">
+        <title>Spider4VideoStation</title>
+        <meta http-equiv="Expires" content="0"> 
+        <meta http-equiv="Cache-Control" content="no-cache"> 
+        <meta http-equiv="Pragma" content="no-cache"> 
+    </head>
+    <body>
+        <p>
+            <a href="plugin?publishPrefix=http://127.0.0.1:33333" style="font-size:x-large;">下载插件（自用）</a>
+            <a href="javascript:;" onclick="redirect('plugin')" style="font-size:x-large;margin-left:100px;">下载插件（公用）</a>
+        </p>
+        <p>
+            <a href="javascript:;" onclick="doubanLogin()" style="font-size:x-large;">豆瓣登录</a>
+        </p>
+        <p>
+            插件测试：
+            <select id="pluginId">@@PluginIds@@</select>
+            <br>
+            类型：
+            <select id="type"><option>movie</option></select>
+            语言：
+            <select id="lang"><option value="chs">简中</option><option value="jpn">日语</option></select>
+            <br>
+            关键词：
+            <input id="title"/>
+            条数：
+            <input id="limit" type="number" value="1"/>
+            <br>
+            <button id="btn" onclick="search()">搜索</button>
+        </p>
+        <textarea id="searchRst" placeholder="搜索结果" style="width:1000px;height:500px;"></textarea>
+    </body>
+    <script>
+function publishPrefix(){
+    return location.href;
+}
+function redirect(path){
+    location.href = path+'?publishPrefix='+encodeURIComponent(publishPrefix());
+}
+function doubanLogin(){
+    document.body.innerHTML = '<h1>开始登录流程，请等待...<h1>';
+    post('douban/login?publishPrefix='+encodeURIComponent(publishPrefix()), null, function(loginState){
+        if(loginState.logined){
+            document.body.innerHTML = '<h1>当前豆瓣为已登录状态，可以在VideoStation中使用豆瓣插件进行刮削了~<h1>';
+        }else{
+            document.body.innerHTML = '<h1>未登录，请使用豆瓣手机APP扫描以下二维码登录</h1><br><img src='+loginState.qrLoginImg+'></img><br><h1>登录成功后本页面会自动跳转</h1>';
+            setTimeout(doubanCheckLoginSuc, 10000);
+        }
+    }, function(){
+        document.body.innerHTML = '<h1>登录失败！</h1>';
+    });
+}
+function doubanCheckLoginSuc(){
+    post('douban/login?waitSuccess=true&publishPrefix='+encodeURIComponent(publishPrefix()), null, function(loginState){
+        if(loginState.logined){
+            document.body.innerHTML = '<h1>登录成功！可以在VideoStation中使用豆瓣插件进行刮削了~</h1>';
+        }else{
+            document.body.innerHTML = '<h1>登录失败！</h1>';
+        }
+    }, function(){
+        document.body.innerHTML = '<h1>登录失败！</h1>';
+    });
+}
+function search(){
+    var pluginId = document.getElementById('pluginId').value;
+    var type = document.getElementById('type').value;
+    var lang = document.getElementById('lang').value;
+    var title = document.getElementById('title').value;
+    var limit = document.getElementById('limit').value;
+    if(!title) {
+        document.getElementById('searchRst').value = '关键词不能为空';
+        return;
+    }
+    var input = JSON.stringify({'title':title});
+    
+    var body = '--type '+type+' --lang '+lang+' --input '+input+' --limit '+limit;
+    
+    document.getElementById('btn').disabled=true;
+    document.getElementById('searchRst').value = '搜索中...';
+    post('search?pluginId='+pluginId+'&publishPrefix='+encodeURIComponent(publishPrefix()), body, function(rst){
+        document.getElementById('searchRst').value = JSON.stringify(rst, null, 1);
+        document.getElementById('btn').disabled=false;
+    })
+}
+function post(uri, body, callback, failCallback){
+    var xhr = new XMLHttpRequest();
+    xhr.responseType = 'json';
+    xhr.onload = function(){
+        console.log('xhr rst', xhr.response);
+        if(callback) callback(xhr.response);
+    };
+    xhr.onerror = function(){
+        console.log('xhr err', xhr.status, xhr);
+        if(failCallback) failCallback();
+    };
+    xhr.open('POST', uri);
+    xhr.send(body);
+}
+    </script>
+</html>

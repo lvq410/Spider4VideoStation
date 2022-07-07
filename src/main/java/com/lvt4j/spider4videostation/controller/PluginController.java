@@ -1,4 +1,4 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.controller;
 
 import static com.lvt4j.spider4videostation.Consts.PluginTestUseTitle;
 
@@ -17,13 +17,17 @@ import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
+
+import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.Utils;
+import com.lvt4j.spider4videostation.pojo.Args;
 
 import lombok.Cleanup;
 
@@ -35,9 +39,6 @@ import lombok.Cleanup;
 @RequestMapping("plugin")
 public class PluginController {
 
-    @Autowired
-    private Config config;
-    
     private String tpl_loader;
     
     @PostConstruct
@@ -46,13 +47,14 @@ public class PluginController {
     }
     
     @GetMapping
-    public void plugin(HttpServletResponse response) throws Exception {
+    public void plugin(HttpServletResponse response,
+            @RequestParam String publishPrefix) throws Exception {
         @Cleanup ByteArrayOutputStream baos = new ByteArrayOutputStream();
         @Cleanup ZipOutputStream zioOut = new ZipOutputStream(baos);
         
         for(Plugin plugin : Plugin.values()){
             zioOut.putNextEntry(new ZipEntry(plugin.id+".zip"));
-            IOUtils.write(singlePluginZip(plugin), zioOut);
+            IOUtils.write(singlePluginZip(publishPrefix, plugin), zioOut);
         }
         
         zioOut.close(); baos.close();
@@ -68,7 +70,7 @@ public class PluginController {
         IOUtils.write(data, response.getOutputStream());
     }
     
-    byte[] singlePluginZip(Plugin plugin) throws IOException {
+    byte[] singlePluginZip(String publishPrefix, Plugin plugin) throws IOException {
         @Cleanup ByteArrayOutputStream baos = new ByteArrayOutputStream();
         @Cleanup ZipOutputStream zioOut = new ZipOutputStream(baos);
         
@@ -84,8 +86,11 @@ public class PluginController {
         zioOut.putNextEntry(new ZipEntry(plugin.id+"/INFO"));
         IOUtils.write(Utils.ObjectMapper.writeValueAsBytes(info), zioOut);
         
-        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getPublishPrefix())
-            .path("search").queryParam("pluginId", plugin.id).toUriString();
+        String searchUrl = UriComponentsBuilder.fromHttpUrl(publishPrefix)
+            .path("search")
+            .queryParam("pluginId", plugin.id)
+            .queryParam("publishPrefix", publishPrefix)
+            .toUriString();
         String loaderCnt = tpl_loader.replace("@@SearchUrl@@", searchUrl);
         zioOut.putNextEntry(new ZipEntry(plugin.id+"/loader.sh"));
         IOUtils.write(loaderCnt.getBytes(), zioOut);

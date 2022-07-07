@@ -1,4 +1,4 @@
-package com.lvt4j.spider4videostation;
+package com.lvt4j.spider4videostation.pojo;
 
 import static org.apache.commons.lang3.StringUtils.EMPTY;
 
@@ -49,7 +49,7 @@ public class Movie {
         return extra.get(pluginId);
     }
     
-    class Extra {
+    public class Extra {
         public List<String> backdrop = new ArrayList<>();
         public List<String> poster = new ArrayList<>();
         public Map<String, BigDecimal> rating = new HashMap<>();
