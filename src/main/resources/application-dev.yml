@@ -1,3 +1,9 @@
+#本地测试docker脚本：
+#docker run -p 14444:4444 -p 17900:7900 --shm-size="2g" -u root -e SE_VNC_NO_PASSWORD=1 -e SE_NODE_MAX_SESSIONS=8 -e SE_NODE_OVERRIDE_MAX_SESSIONS=true -e SE_SCREEN_WIDTH=852 -e SE_SCREEN_HEIGHT=480 -e SE_SCREEN_DEPTH=16 -e SE_SCREEN_DPI=24 -v E:\Download\Spider4VideoStationStatic:/home/seluser/Downloads selenium/standalone-chrome:103.0.5060.53-chromedriver-103.0.5060.53-grid-4.3.0-20220628
+
+#本地集成镜像测试docker脚本
+#docker run -p 34444:4444 -p 37900:7900 -p 33333:33333 --shm-size="2g" lvq410/spider4videostation:dev
+
 spring:
   boot.admin.client:
     enabled: true
@@ -6,6 +12,16 @@ logging:
   level:
     com.lvt4j.spider4videostation: trace
 
-webDriverHeadless: false
+webDriverAddr: http://127.0.0.1:14444
+webDriverArgs:
+#- "--headless"
+- "--disable-gpu"
+- "--disable-extensions"
+- "--disable-browser-side-navigation"
+- "--disable-dev-shm-usage"
+- "--blink-settings=imagesEnabled=false"
+- "--no-sandbox"
+- "--start-maximized"
+- "--enable-automation"
 
 staticChromeDownloadFolder: E:\Download\Spider4VideoStationStatic

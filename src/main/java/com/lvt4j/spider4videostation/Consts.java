@@ -15,9 +15,6 @@ public class Consts {
 
     public static final String PluginIdPrefix = "com.lvt4j.Spider4VideoStation";
 
-    public static final String ChromeArg_Headless = "--headless";
-    public static final String ChromeArg_NoImage = "--blink-settings=imagesEnabled=false";
-    
     public static final File Folder_Cache = new File("cache");
     public static final File Folder_Cookies = new File("cookies");
     

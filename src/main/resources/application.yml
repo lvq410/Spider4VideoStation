@@ -28,8 +28,8 @@ logging:
     root: info
 
 webDriverAddr: http://127.0.0.1:4444
-webDriverHeadless: true
 webDriverArgs:
+#- "--headless"
 - "--disable-gpu"
 - "--disable-extensions"
 - "--disable-browser-side-navigation"
@@ -48,7 +48,7 @@ staticWebDriverArgs:
 - "--start-maximized"
 - "--enable-automation"
 
-staticLoadTimeoutMillis: 300000
+staticLoadTimeoutMillis: 60000
 
 staticChromeDownloadFolder: /home/seluser/Downloads
 
@@ -57,7 +57,7 @@ cacheExpireDuration: 2592000000
 
 javdbOrigin: https://javdb36.com
 javdbTouchUrl: ${javdbOrigin}/manifest.json
-javdbTimeoutMillis: 300000
+javdbTimeoutMillis: 30000
 
 doubanDomain: douban.com
 doubanOrigin: https://${doubanDomain}
@@ -73,4 +73,5 @@ doubanLoginCheckableDomain:
 - ${doubanMovieDomain}
 doubanLoginCheckUrl: ${doubanMovieOrigin}
 doubanLoginUrl: https://accounts.${doubanDomain}/passport/login
-doubanTimeoutMillis: 10000
+doubanTimeoutMillis: 30000
+doubanMaxLimit: 4

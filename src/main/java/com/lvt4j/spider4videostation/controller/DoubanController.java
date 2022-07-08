@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.lvt4j.spider4videostation.service.DoubanService;
 import com.lvt4j.spider4videostation.service.DoubanService.LoginState;
@@ -41,6 +42,7 @@ public class DoubanController {
     }
     
     @GetMapping("cover")
+    @Deprecated
     public void cover(HttpServletResponse response,
             @RequestParam String pre) throws IOException {
         byte[] bs = service.coverPre(pre);
@@ -53,5 +55,10 @@ public class DoubanController {
         response.setContentLength(bs.length);
         IOUtils.write(bs, response.getOutputStream());
     }
-    
+    @Deprecated
+    public String coverPreWrap(String publishPrefix, String preUrl) {
+        return UriComponentsBuilder.fromHttpUrl(publishPrefix)
+            .path("douban/cover")
+            .queryParam("pre", preUrl).toUriString();
+    }
 }

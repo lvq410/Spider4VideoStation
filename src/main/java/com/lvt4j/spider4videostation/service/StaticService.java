@@ -45,6 +45,7 @@ public class StaticService {
     @PostConstruct
     private void init() {
         folder = new File(config.getStaticChromeDownloadFolder());
+        folder.mkdirs();
     }
     
     @SneakyThrows

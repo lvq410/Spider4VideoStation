@@ -8,6 +8,7 @@ import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.FilenameUtils;
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -66,22 +67,31 @@ public class StaticController {
     
     @GetMapping
     public void proxy(HttpServletResponse response,
-            @RequestParam String url) throws Throwable {
+            @RequestParam String url,
+            @RequestParam(required=false) String mediaType) throws Throwable {
         byte[] bs = cacher.load(url);
         if(bs!=null){
-            responseData(url, bs, response);
+            responseData(url, mediaType, bs, response);
             return;
         }
         
         synchronized(this){
-            service.downAsCache(driver(), url);
+            Utils.retry(()->{
+                driver();
+                service.downAsCache(webDriver, url);
+            }, (e, n)->{
+                log.error("err on web load : {}", url, e);
+                destory();
+                if(n==1) return true;
+                throw new RuntimeException("err on web load", e);
+            });
         }
         
         Utils.waitUntil(()->cacher.exist(url), config.getStaticLoadTimeoutMillis());
         bs = cacher.load(url);
         
         if(bs!=null){
-            responseData(url, bs, response);
+            responseData(url, mediaType, bs, response);
             return;
         }else{
             throw new ResponseStatusException(HttpStatus.NOT_FOUND);
@@ -108,8 +118,12 @@ public class StaticController {
         return webDriver;
     }
     @SneakyThrows
-    private void responseData(String url, byte[] bs, HttpServletResponse response) {
-        MediaType mediaType = MediaTypeFactory.getMediaType(FilenameUtils.getName(url))
+    private void responseData(String url, String mediaTypeStr, byte[] bs, HttpServletResponse response) {
+        MediaType mediaType = null;
+        try{
+            if(StringUtils.isNotBlank(mediaTypeStr)) mediaType = MediaType.valueOf(mediaTypeStr);
+        }catch(Exception ig){}
+        if(mediaType==null) mediaType = MediaTypeFactory.getMediaType(FilenameUtils.getName(url))
             .orElse(MediaType.APPLICATION_OCTET_STREAM);
         response.setContentType(mediaType.toString());
         response.setContentLength(bs.length);
@@ -124,10 +138,15 @@ public class StaticController {
         latestWebDriverTouchTime = System.currentTimeMillis();
     }
     
-    public String staticWrap(String publishPrefix, String url) {
+    public String jpgWrap(String publishPrefix, String url) {
+        return staticWrap(publishPrefix, url, MediaType.IMAGE_JPEG_VALUE);
+    }
+    private String staticWrap(String publishPrefix, String url, String mediaType) {
         return UriComponentsBuilder.fromHttpUrl(publishPrefix)
-            .path("static")
-            .queryParam("url", url).toUriString();
+                .path("static")
+                .queryParam("url", url)
+                .queryParam("mediaType", mediaType)
+                .toUriString();
     }
     
 }

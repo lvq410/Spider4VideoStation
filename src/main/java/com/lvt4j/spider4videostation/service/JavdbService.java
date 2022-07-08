@@ -142,7 +142,7 @@ public class JavdbService implements SpiderService {
             if(coverImg!=null){
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.staticWrap(publishPrefix, coverUrl);
+                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
                 }
             }
             
@@ -190,7 +190,7 @@ public class JavdbService implements SpiderService {
         if(coverImg!=null) {
             coverUrl = coverImg.absUrl("src");
             if(StringUtils.isNotBlank(coverUrl)){
-                coverUrl = staticController.staticWrap(publishPrefix, coverUrl);
+                coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
                 movie.extra().poster.add(coverUrl);
             }
         }
@@ -265,7 +265,7 @@ public class JavdbService implements SpiderService {
         for(Element previewA : previewAs){
             String previewUrl = previewA.absUrl("href");
             if(StringUtils.isBlank(previewUrl)) continue;
-            previewUrl = staticController.staticWrap(publishPrefix, previewUrl);
+            previewUrl = staticController.jpgWrap(publishPrefix, previewUrl);
             movie.extra().backdrop.add(previewUrl);
         }
         if(previewAs.isEmpty()){ //无预览图时，用回大封面做背景图

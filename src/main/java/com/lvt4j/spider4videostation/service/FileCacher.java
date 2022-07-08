@@ -120,6 +120,13 @@ public class FileCacher {
             deleteFileParently(file);
         }
     }
+    @ManagedOperation
+    public long clean() throws Exception {
+        long size = FileUtils.sizeOf(Folder_Cache);
+        FileUtils.cleanDirectory(Folder_Cache);
+        return size;
+    }
+    
     private void deleteFileParently(File file) {
         file.delete();
         File folder = file.getParentFile();

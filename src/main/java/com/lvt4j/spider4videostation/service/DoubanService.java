@@ -1,6 +1,5 @@
 package com.lvt4j.spider4videostation.service;
 
-import static com.lvt4j.spider4videostation.Consts.ChromeArg_NoImage;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 import java.io.File;
@@ -40,6 +39,7 @@ import com.lvt4j.spider4videostation.Config;
 import com.lvt4j.spider4videostation.Consts;
 import com.lvt4j.spider4videostation.Plugin;
 import com.lvt4j.spider4videostation.Utils;
+import com.lvt4j.spider4videostation.controller.DoubanController;
 import com.lvt4j.spider4videostation.controller.StaticController;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Movie;
@@ -68,6 +68,8 @@ public class DoubanService implements SpiderService {
     
     @Autowired@Lazy
     private StaticController staticController;
+    @Autowired@Lazy
+    private DoubanController doubanController;
     
     private RemoteWebDriver webDriver4Search;
     private long latestWebDriver4SearchTouchTime;
@@ -120,6 +122,8 @@ public class DoubanService implements SpiderService {
     }
     @SneakyThrows
     private void searchMovie(String publishPrefix, Plugin plugin, Args args, Rst rst) {
+        args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
+        
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
             .queryParam("search_text", args.input.title).toUriString();
         log.info("open search {}", searchUrl);
@@ -163,7 +167,7 @@ public class DoubanService implements SpiderService {
             if(coverImg!=null) {
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.staticWrap(publishPrefix, coverUrl);
+                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
                 }
             }
             
@@ -215,7 +219,7 @@ public class DoubanService implements SpiderService {
             if(mainpicImg!=null){
                 String posterUrl = mainpicImg.absUrl("src");
                 if(StringUtils.isNotBlank(posterUrl)){
-                    posterUrl = staticController.staticWrap(publishPrefix, posterUrl);
+                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl);
                     movie.extra().poster.add(posterUrl);
                 }
             }
@@ -310,11 +314,12 @@ public class DoubanService implements SpiderService {
         List<Triple<String, Long, Long>> coverAndSizes = new ArrayList<>();
         Elements lis = ul.select("li");
         for(Element li : lis){
-            Element coverA = li.selectFirst("div.cover a");
-            if(coverA==null) continue;
-            String coverPreUrl = coverA.absUrl("href");
-            if(StringUtils.isBlank(coverPreUrl)) continue;
-            coverPreUrl = coverPreWrap(publishPrefix, coverPreUrl);
+            Element coverImg = li.selectFirst("div.cover a img");
+            if(coverImg==null) continue;
+            String coverUrl = coverImg.absUrl("src");
+            if(StringUtils.isBlank(coverUrl)) continue;
+            coverUrl = coverUrl.replace("view/photo/m/public", "view/photo/1/public");
+            coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
             
             long w=0,h=0;
             Element propDiv = li.selectFirst("div.prop");
@@ -328,7 +333,7 @@ public class DoubanService implements SpiderService {
                     }catch(Exception ig){}
                 }
             }
-            coverAndSizes.add(Triple.of(coverPreUrl, w, h));
+            coverAndSizes.add(Triple.of(coverUrl, w, h));
         }
         if(coverAndSizes.isEmpty()) return;
         
@@ -419,12 +424,6 @@ public class DoubanService implements SpiderService {
         }
     }
     
-    private String coverPreWrap(String publishPrefix, String preUrl) {
-        return UriComponentsBuilder.fromHttpUrl(publishPrefix)
-                .path("douban/cover")
-                .queryParam("pre", preUrl).toUriString();
-    }
-    
     /**
      * 用 webDriver4Search 检查登录状态
      * 如已登录，则返回已登录
@@ -465,15 +464,8 @@ public class DoubanService implements SpiderService {
         webDriver4Search.findElementByCssSelector(".quick.icon-switch").click();
         
         String qrLoginImgUrl = webDriver4Search.findElementByCssSelector("div.account-qr-scan img").getAttribute("src");
-//        Element qrImg = Jsoup.parse(webDriver4Search.getPageSource()).selectFirst("div.account-qr-scan img");
-//        if(qrImg==null) return false;
-//        return true;
-//        Utils.waitUntil(()->{
-//            
-//        }, 10000);
-//        String qrLoginImgUrl = .absUrl("src");
         log.trace("found qr login img : {}", qrLoginImgUrl);
-        state.qrLoginImg = staticController.staticWrap(publishPrefix, qrLoginImgUrl);
+        state.qrLoginImg = staticController.jpgWrap(publishPrefix, qrLoginImgUrl);
         return state;
     }
     
@@ -502,6 +494,7 @@ public class DoubanService implements SpiderService {
     }
     
     @SneakyThrows
+    @Deprecated
     public synchronized byte[] coverPre(String preUrl) {
         byte[] bs = cacher.load(preUrl);
         if(bs!=null) return bs;
@@ -551,9 +544,7 @@ public class DoubanService implements SpiderService {
         
         ChromeOptions options = new ChromeOptions();
         options.setPageLoadStrategy(PageLoadStrategy.EAGER);
-        List<String> args = new ArrayList<>(config.getWebDriverArgs());
-        args.remove(ChromeArg_NoImage);
-        options.addArguments(args);
+        options.addArguments(config.getStaticWebDriverArgs());
         
         log.info("init webdriver4Static {}", config.getWebDriverAddr());
         webDriver4Static = new RemoteWebDriver(new URL(config.getWebDriverAddr()), options);

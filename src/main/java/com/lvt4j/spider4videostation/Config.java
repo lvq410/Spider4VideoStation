@@ -1,8 +1,5 @@
 package com.lvt4j.spider4videostation;
 
-import static com.lvt4j.spider4videostation.Consts.ChromeArg_Headless;
-
-import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -23,7 +20,6 @@ import lombok.Setter;
 public class Config {
 
     private String webDriverAddr;
-    private boolean webDriverHeadless;
     private List<String> webDriverArgs;
 
     private List<String> staticWebDriverArgs;
@@ -50,18 +46,6 @@ public class Config {
     private String doubanLoginCheckUrl;
     private String doubanLoginUrl;
     private long doubanTimeoutMillis;
-    
-    
-    
-    public List<String> getWebDriverArgs() {
-        List<String> webDriverArgs = new ArrayList<>(this.webDriverArgs);
-        if(webDriverHeadless) webDriverArgs.add(ChromeArg_Headless);
-        return webDriverArgs;
-    }
-    public List<String> getStaticWebDriverArgs() {
-        List<String> staticWebDriverArgs = new ArrayList<>(this.staticWebDriverArgs);
-        if(webDriverHeadless) staticWebDriverArgs.add(ChromeArg_Headless);
-        return staticWebDriverArgs;
-    }
+    private int doubanMaxLimit;
     
 }

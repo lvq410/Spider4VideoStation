@@ -8,8 +8,10 @@
     </head>
     <body>
         <p>
-            <a href="plugin?publishPrefix=http://127.0.0.1:33333" style="font-size:x-large;">下载插件（自用）</a>
-            <a href="javascript:;" onclick="redirect('plugin')" style="font-size:x-large;margin-left:100px;">下载插件（公用）</a>
+            <a href="javascript:;" onclick="redirect('plugin')" style="font-size:x-large;">下载插件</a>
+        </p>
+        <p>
+            <a href="javascript:;" onclick="cleanCache()" style="font-size:x-large;">清空缓存</a>
         </p>
         <p>
             <a href="javascript:;" onclick="doubanLogin()" style="font-size:x-large;">豆瓣登录</a>
@@ -39,6 +41,24 @@ function publishPrefix(){
 function redirect(path){
     location.href = path+'?publishPrefix='+encodeURIComponent(publishPrefix());
 }
+function cleanCache(){
+    if(!confirm('确定要清空缓存吗？')) return;
+    document.body.innerHTML = '<h1>清理中，请等待...<h1>';
+    post('cleanCache', null, function(size){
+        document.body.innerHTML = '<h1>成功清理'+GMKB(size)+'缓存<h1>';
+    }, function(){
+        document.body.innerHTML = '<h1>清理失败！</h1>';
+    });
+}
+function GMKB(size){
+    if(size<1024) return size.toFixed(2) + 'B';
+    size = size/1024;
+    if(size<1024) return size.toFixed(2) + 'K';
+    size = size/1024;
+    if(size<1024) return size.toFixed(2) + 'M';
+    size = size/1024;
+    if(size<1024) return size.toFixed(2) + 'G';
+};
 function doubanLogin(){
     document.body.innerHTML = '<h1>开始登录流程，请等待...<h1>';
     post('douban/login?publishPrefix='+encodeURIComponent(publishPrefix()), null, function(loginState){
