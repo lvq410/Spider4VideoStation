@@ -155,7 +155,7 @@ public class DoubanService implements SpiderService {
             String title = null;
             Element titleDiv = detailDiv.selectFirst("div.title");
             if(titleDiv!=null) {
-                title = titleDiv.text().trim();
+                title = StringUtils.strip(titleDiv.text().trim(), "　");
                 if(title.indexOf('(')>0){
                     title = title.substring(0, title.indexOf('(')).trim();
                 }
@@ -210,7 +210,7 @@ public class DoubanService implements SpiderService {
         
         Element titleSpan = contentDiv.selectFirst("h1 span");
         if(titleSpan!=null){
-            movie.title = titleSpan.text().trim();
+            movie.title = StringUtils.strip(titleSpan.text().trim(), "　");
         }
         
         Element mainpicDiv = contentDiv.selectFirst("#mainpic");
