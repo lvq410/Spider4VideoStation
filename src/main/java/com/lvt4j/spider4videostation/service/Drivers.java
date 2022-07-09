@@ -64,7 +64,7 @@ public class Drivers {
                 log.trace("searcher open url : {}", url);
                 searcher.driver.get(url);
             }, (e, n)->{
-                log.error("searcher open url err {}", url, e);
+                log.warn("searcher open url err {}", url, e);
                 searcher.destory();
                 if(n==1) return true;
                 throw new RuntimeException("searcher open url err", e);
@@ -108,7 +108,7 @@ public class Drivers {
                 log.trace("staticer open url : {}", url);
                 staticer.driver.get(url);
             }, (e, n)->{
-                log.error("staticer open url err {}", url, e);
+                log.warn("staticer open url err {}", url, e);
                 staticer.destory();
                 if(n==1) return true;
                 throw new RuntimeException("staticer open url err", e);

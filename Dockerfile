@@ -1,6 +1,5 @@
 # 基础镜像
-#FROM selenium/standalone-chrome:103.0.5060.53-chromedriver-103.0.5060.53-grid-4.3.0-20220628
-FROM selenium/standalone-chrome:102.0.5005.61-chromedriver-102.0.5005.61-grid-4.2.2-20220609
+FROM selenium/standalone-chrome:103.0.5060.53-chromedriver-103.0.5060.53-grid-4.3.0-20220628
 
 #RUN apt install net-tools
 #RUN apt install --no-cache nss
