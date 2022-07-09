@@ -21,6 +21,8 @@ public class Config {
 
     private String webDriverAddr;
     private List<String> webDriverArgs;
+    public long webDriverSearcherTimeoutMillis;
+    public long webDriverStaticerTimeoutMillis;
 
     private List<String> staticWebDriverArgs;
     private long staticLoadTimeoutMillis;
@@ -31,7 +33,7 @@ public class Config {
     
     private String javdbOrigin;
     private String javdbTouchUrl;
-    private int javdbTimeoutMillis;
+//    private int javdbTimeoutMillis;
     
     private String doubanDomain;
     private String doubanOrigin;
@@ -45,7 +47,7 @@ public class Config {
     private List<String> doubanLoginCheckableDomain;
     private String doubanLoginCheckUrl;
     private String doubanLoginUrl;
-    private long doubanTimeoutMillis;
+//    private long doubanTimeoutMillis;
     private int doubanMaxLimit;
     
 }

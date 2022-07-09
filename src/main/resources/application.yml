@@ -38,6 +38,8 @@ webDriverArgs:
 - "--no-sandbox"
 - "--start-maximized"
 - "--enable-automation"
+webDriverSearcherTimeoutMillis: 30000
+webDriverStaticerTimeoutMillis: 30000
 
 staticWebDriverArgs:
 - "--disable-gpu"

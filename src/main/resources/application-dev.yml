@@ -1,5 +1,6 @@
 #本地测试docker脚本：
-#docker run -p 14444:4444 -p 17900:7900 --shm-size="2g" -u root -e SE_VNC_NO_PASSWORD=1 -e SE_NODE_MAX_SESSIONS=8 -e SE_NODE_OVERRIDE_MAX_SESSIONS=true -e SE_SCREEN_WIDTH=852 -e SE_SCREEN_HEIGHT=480 -e SE_SCREEN_DEPTH=16 -e SE_SCREEN_DPI=24 -v E:\Download\Spider4VideoStationStatic:/home/seluser/Downloads selenium/standalone-chrome:103.0.5060.53-chromedriver-103.0.5060.53-grid-4.3.0-20220628
+#docker run -p 4444:4444 -p 17900:7900 --shm-size="2g" -u root -e SE_VNC_NO_PASSWORD=1 -e SE_NODE_MAX_SESSIONS=8 -e SE_NODE_OVERRIDE_MAX_SESSIONS=true -e SE_SCREEN_WIDTH=852 -e SE_SCREEN_HEIGHT=480 -e SE_SCREEN_DEPTH=16 -e SE_SCREEN_DPI=24 -v E:\Download\Spider4VideoStationStatic:/home/seluser/Downloads selenium/standalone-chrome:103.0.5060.53-chromedriver-103.0.5060.53-grid-4.3.0-20220628
+#docker run -p 4444:4444 -p 17900:7900 --shm-size="2g" -u root -e SE_VNC_NO_PASSWORD=true -e SE_NODE_MAX_SESSIONS=8 -e SE_NODE_OVERRIDE_MAX_SESSIONS=true -e SE_SCREEN_WIDTH=852 -e SE_SCREEN_HEIGHT=480 -e SE_SCREEN_DEPTH=16 -e SE_SCREEN_DPI=24 -v E:\Download\Spider4VideoStationStatic:/home/seluser/Downloads selenium/standalone-chrome:102.0.5005.61-chromedriver-102.0.5005.61-grid-4.2.2-20220609
 
 #本地集成镜像测试docker脚本
 #docker run -p 34444:4444 -p 37900:7900 -p 33333:33333 --shm-size="2g" lvq410/spider4videostation:dev
@@ -12,7 +13,7 @@ logging:
   level:
     com.lvt4j.spider4videostation: trace
 
-webDriverAddr: http://127.0.0.1:14444
+webDriverAddr: http://127.0.0.1:4444
 webDriverArgs:
 #- "--headless"
 - "--disable-gpu"

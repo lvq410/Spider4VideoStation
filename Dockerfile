@@ -1,5 +1,6 @@
 # 基础镜像
-FROM selenium/standalone-chrome:103.0.5060.53-chromedriver-103.0.5060.53-grid-4.3.0-20220628
+#FROM selenium/standalone-chrome:103.0.5060.53-chromedriver-103.0.5060.53-grid-4.3.0-20220628
+FROM selenium/standalone-chrome:102.0.5005.61-chromedriver-102.0.5005.61-grid-4.2.2-20220609
 
 #RUN apt install net-tools
 #RUN apt install --no-cache nss
@@ -11,7 +12,7 @@ EXPOSE 7900/tcp
 # 关掉没用的selenium监控页面的密码
 ENV SE_VNC_NO_PASSWORD=1
 # 调大selenium的最大会话数
-ENV SE_NODE_MAX_SESSIONS=8
+ENV SE_NODE_MAX_SESSIONS=4
 ENV SE_NODE_OVERRIDE_MAX_SESSIONS=true
 
 # 调小虚拟浏览器资源消耗

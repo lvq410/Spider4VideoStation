@@ -72,11 +72,12 @@ public class FileCacher {
         FileUtils.writeByteArrayToFile(cacheFile, cnt);
     }
     @SneakyThrows
-    public void save(String url, File origFile) {
+    public File save(String url, File origFile) {
         if(log.isTraceEnabled()) log.trace("save cache {}", url);
         File cacheFile = cacheFile(url);
         FileUtils.deleteQuietly(cacheFile);
         origFile.renameTo(cacheFile);
+        return cacheFile;
     }
     
     @SneakyThrows

@@ -16,7 +16,6 @@ import org.springframework.web.server.ResponseStatusException;
 import com.lvt4j.spider4videostation.Config;
 import com.lvt4j.spider4videostation.Utils;
 
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -39,6 +38,8 @@ public class StaticService {
     private Config config;
     @Autowired
     private FileCacher cacher;
+    @Autowired
+    private Drivers drivers;
     
     private File folder;
     
@@ -48,31 +49,29 @@ public class StaticService {
         folder.mkdirs();
     }
     
-    @SneakyThrows
-    public synchronized void downAsCache(RemoteWebDriver webDriver, String url) {
-        log.info("down static {}", url);
-        if(log.isTraceEnabled()) log.trace("open {}", url);
-        webDriver.get(url);
-        
-        File downFile = sendScriptAndWaitFile(webDriver);
-        
-        cacher.save(url, downFile);
+    public void downAsCache(String url) throws Throwable {
+        log.info("downloading static {}", url);
+        synchronized(folder){
+            drivers.staticOpen(url, driver->{
+                File downFile = sendScriptAndWaitFile(driver);
+                cacher.save(url, downFile);
+            });
+        }
     }
     
-    @SneakyThrows
-    public synchronized byte[] downCurAsBs(RemoteWebDriver webDriver) {
-        String url = webDriver.getCurrentUrl();
-        log.info("down static {}", url);
-        
-        File downFile = sendScriptAndWaitFile(webDriver);
-        
-        byte[] bs = FileUtils.readFileToByteArray(downFile);
-        
-        return bs;
-    }
+//    @SneakyThrows
+//    public synchronized byte[] downCurAsBs(RemoteWebDriver webDriver) {
+//        String url = webDriver.getCurrentUrl();
+//        log.info("down static {}", url);
+//        
+//        File downFile = sendScriptAndWaitFile(webDriver);
+//        
+//        byte[] bs = FileUtils.readFileToByteArray(downFile);
+//        
+//        return bs;
+//    }
     
-    @SneakyThrows
-    private File sendScriptAndWaitFile(RemoteWebDriver webDriver) {
+    private File sendScriptAndWaitFile(RemoteWebDriver webDriver) throws Throwable {
         if(log.isTraceEnabled()) log.trace("clean down folder {}", folder.getAbsolutePath());
         FileUtils.cleanDirectory(folder);
         

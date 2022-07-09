@@ -4,15 +4,10 @@ import static org.apache.commons.lang3.StringUtils.EMPTY;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.Date;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-
-import javax.annotation.PreDestroy;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -20,18 +15,11 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import org.openqa.selenium.Cookie;
-import org.openqa.selenium.PageLoadStrategy;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.chrome.ChromeOptions;
-import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
-import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.lvt4j.spider4videostation.Config;
-import com.lvt4j.spider4videostation.Consts;
 import com.lvt4j.spider4videostation.Plugin;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.controller.StaticController;
@@ -61,20 +49,8 @@ public class JavdbService implements SpiderService {
     @Autowired@Lazy
     private StaticController staticController;
     
-    private RemoteWebDriver webDriver;
-    private long latestWebDriverTouchTime;
-    
-    @PreDestroy
-    private void destory() {
-        if(webDriver==null) return;
-        try{
-            webDriver.quit();
-        }catch(Exception ig){
-            log.warn("err on web quit {}", ig);
-        }finally {
-            webDriver = null;
-        }
-    }
+    @Autowired
+    private Drivers drivers;
     
     @Override
     public boolean support(Plugin plugin, Args args) {
@@ -294,59 +270,9 @@ public class JavdbService implements SpiderService {
         String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
         
-        Utils.retry(()->{
-            driver().get(url);
-        }, (e, n)->{
-            log.error("err on web load {}", url, e);
-            destory();
-            if(n==1) return true;
-            throw new RuntimeException("err on web load", e);
+        return drivers.search(url, (driver,src)->{
+            if(url.equals(driver.getCurrentUrl())) cacher.saveAsStr(url, src);
         });
-        
-        String cnt = webDriver.getPageSource();
-        
-        if(url.equals(webDriver.getCurrentUrl())) cacher.saveAsStr(url, cnt);
-        
-        return cnt;
-    }
-    
-    @SneakyThrows
-    private WebDriver driver() {
-        if(webDriver!=null) {
-            latestWebDriverTouchTime = System.currentTimeMillis();
-            return webDriver;
-        }
-        
-        ChromeOptions options = new ChromeOptions();
-        options.setPageLoadStrategy(PageLoadStrategy.EAGER);
-        options.addArguments(config.getWebDriverArgs());
-        
-        log.info("init webdriver {}", config.getWebDriverAddr());
-        webDriver = new RemoteWebDriver(new URL(config.getWebDriverAddr()), options);
-        
-        webDriver.manage().timeouts()
-            .pageLoadTimeout(config.getJavdbTimeoutMillis(), TimeUnit.MILLISECONDS)
-            .setScriptTimeout(config.getJavdbTimeoutMillis(), TimeUnit.MILLISECONDS);
-        
-        if(log.isTraceEnabled()) log.trace("open javdb touchUrl : {}", config.getJavdbTouchUrl());
-        webDriver.get(config.getJavdbTouchUrl());
-        
-        Date cookieExpire = new Date(System.currentTimeMillis()+365*24*60*60*1000);
-        webDriver.manage().addCookie(new Cookie("list_mode", "v",    null, "/", cookieExpire));
-        webDriver.manage().addCookie(new Cookie("over18",    "1",    null, "/", cookieExpire));
-        webDriver.manage().addCookie(new Cookie("locale",    "zh",   null, "/", cookieExpire));
-        webDriver.manage().addCookie(new Cookie("theme",     "auto", null, "/", cookieExpire));
-        
-        return webDriver;
-    }
-    
-    @Scheduled(cron="0/30 * * * * ?")
-    public synchronized void driverKeepAlive() {
-        if(webDriver==null) return;
-        if(System.currentTimeMillis()-latestWebDriverTouchTime<Consts.WebDriverHeartbeatGap) return;
-        if(log.isTraceEnabled()) log.trace("webdriver heartbeat");
-        webDriver.executeScript("console.log('heartbeat')");
-        latestWebDriverTouchTime = System.currentTimeMillis();
     }
     
 }

@@ -86,6 +86,15 @@ public class Utils {
     public interface ThrowableRunnable {
         void run() throws Throwable;
     }
+    public interface ThrowableConsumer<T> {
+        void accept(T t) throws Throwable;
+    }
+    public interface ThrowableBiConsumer<T, U> {
+        void accept(T t, U u) throws Throwable;
+    }
+    public interface ThrowableBiFunction<T, U, R> {
+        R apply(T t, U u) throws Throwable;
+    }
 
     public static boolean waitUntil(Supplier<Boolean> until, long timeout) throws InterruptedException,TimeoutException {
         long beginTime = System.currentTimeMillis(), waitedTime = 0;
