@@ -12,6 +12,7 @@ import javax.annotation.PreDestroy;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SerializationUtils;
+import org.apache.commons.lang3.mutable.MutableObject;
 import org.openqa.selenium.Cookie;
 import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -23,7 +24,7 @@ import org.springframework.stereotype.Service;
 import com.lvt4j.spider4videostation.Config;
 import com.lvt4j.spider4videostation.Consts;
 import com.lvt4j.spider4videostation.Utils;
-import com.lvt4j.spider4videostation.Utils.ThrowableBiConsumer;
+import com.lvt4j.spider4videostation.Utils.ThrowableBiFunction;
 import com.lvt4j.spider4videostation.Utils.ThrowableConsumer;
 import com.lvt4j.spider4videostation.Utils.ThrowableFunction;
 
@@ -56,9 +57,23 @@ public class Drivers {
             run.accept(searcher.driver);
         }
     }
-
-    public String search(String url, ThrowableBiConsumer<RemoteWebDriver, String> run) throws Throwable {
-        String pageSource;
+    public <T> T searchExec(String script, ThrowableBiFunction<RemoteWebDriver, String, T> run) throws Throwable {
+        synchronized(searcher){
+            MutableObject<String> rstRef = new MutableObject<>();
+            Utils.retry(()->{
+                searcher();
+                log.trace("searcher exe script : {}", script);
+                rstRef.setValue((String)searcher.driver.executeScript(script));
+            }, (e, n)->{
+                log.warn("searcher exe script {}", script, e);
+                searcher.destory();
+                if(n==1) return true;
+                throw new RuntimeException("searcher exe script err", e);
+            });
+            return run.apply(searcher.driver, rstRef.getValue());
+        }
+    }
+    public <T> T searchOpen(String url, ThrowableBiFunction<RemoteWebDriver, String, T> run) throws Throwable {
         synchronized(searcher){
             Utils.retry(()->{
                 searcher();
@@ -70,10 +85,9 @@ public class Drivers {
                 if(n==1) return true;
                 throw new RuntimeException("searcher open url err", e);
             });
-            pageSource = searcher.driver.getPageSource();
-            run.accept(searcher.driver, pageSource);
+            String pageSource = searcher.driver.getPageSource();
+            return run.apply(searcher.driver, pageSource);
         }
-        return pageSource;
     }
 
     public boolean isSearcherInited() {
@@ -120,7 +134,6 @@ public class Drivers {
     public void staticerDestory() {
         staticer.destory();
     }
-
     private RemoteWebDriver staticer() throws Throwable {
         if(staticer.driver!=null){
             staticer.latestTouchTime = System.currentTimeMillis();

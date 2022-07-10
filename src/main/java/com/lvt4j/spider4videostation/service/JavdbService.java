@@ -270,8 +270,9 @@ public class JavdbService implements SpiderService {
         String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
         
-        return drivers.search(url, (driver,src)->{
+        return drivers.searchOpen(url, (driver,src)->{
             if(url.equals(driver.getCurrentUrl())) cacher.saveAsStr(url, src);
+            return src;
         });
     }
     

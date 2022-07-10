@@ -13,7 +13,7 @@ shellDir=`pwd`
 
 #分支名为标签名
 #tag=`git branch | grep '*' | awk -F ' ' '{print $2}'`
-tag='dev6.102'
+tag='dev8'
 echo "当前分支"$tag
 echo "开始构建spider4videostation:"$tag"镜像,项目路径："$shellDir
 #用gradle打出jar

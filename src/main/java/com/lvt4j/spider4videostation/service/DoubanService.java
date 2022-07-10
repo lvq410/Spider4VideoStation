@@ -56,6 +56,8 @@ public class DoubanService implements SpiderService {
     private FileCacher cacher;
     @Autowired
     private Drivers drivers;
+    @Autowired
+    private StaticService staticService;
     
     @Autowired@Lazy
     private StaticController staticController;
@@ -261,7 +263,8 @@ public class DoubanService implements SpiderService {
     }
     private void loadBackdrops(String publishPrefix, Movie movie, String mainpicUrl) {
         log.info("load backdrop list {}", mainpicUrl);
-        String mainpicCnt = loadPage(mainpicUrl);
+//        String mainpicCnt = loadPage(mainpicUrl);
+        String mainpicCnt = fetchPage(mainpicUrl);
         if(log.isTraceEnabled()) log.trace("load backdrops cnt {}", mainpicCnt);
         
         Document mainpicDoc = Jsoup.parse(mainpicCnt);
@@ -314,14 +317,25 @@ public class DoubanService implements SpiderService {
         String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
         
-        return drivers.search(url, (driver, src)->{
+        return drivers.searchOpen(url, (driver, src)->{
             if(!isLogined(src)){
                 log.error("未登录，需先登录！");
                 throw new RuntimeException("未登录");
             }
             if(url.equals(driver.getCurrentUrl())) cacher.saveAsStr(url, src);
+            return src;
         });
     }
+    @SneakyThrows
+    private synchronized String fetchPage(String url) {
+        String cached = cacher.loadAsStr(url);
+        if(cached!=null) return cached;
+        
+        byte[] bs = staticService.down(url);
+        cacher.save(url, bs);
+        return new String(bs);
+    }
+    
     
     /**
      * 用 webDriver4Search 检查登录状态
@@ -337,8 +351,9 @@ public class DoubanService implements SpiderService {
         LoginState state = new LoginState();
         
         log.info("redirect login check url : {}", config.getDoubanLoginCheckUrl());
-        drivers.search(config.getDoubanLoginCheckUrl(), (driver, src)->{
+        drivers.searchOpen(config.getDoubanLoginCheckUrl(), (driver, src)->{
             state.logined = isLogined(src);
+            return null;
         });
         log.info("isLogined : {}", state.logined);
         if(state.logined) return state;
@@ -347,13 +362,14 @@ public class DoubanService implements SpiderService {
         drivers.staticerDestory();
         
         log.info("redirect login url : {}", config.getDoubanLoginUrl());
-        drivers.search(config.getDoubanLoginUrl(), (driver, src)->{
+        drivers.searchOpen(config.getDoubanLoginUrl(), (driver, src)->{
             log.trace("try find login switch btn and click it");
             driver.findElementByCssSelector(".quick.icon-switch").click();
             
             String qrLoginImgUrl = driver.findElementByCssSelector("div.account-qr-scan img").getAttribute("src");
             log.trace("found qr login img : {}", qrLoginImgUrl);
             state.qrLoginImg = staticController.jpgWrap(publishPrefix, qrLoginImgUrl);
+            return null;
         });
         return state;
     }
