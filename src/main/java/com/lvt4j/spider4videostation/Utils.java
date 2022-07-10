@@ -3,10 +3,13 @@ package com.lvt4j.spider4videostation;
 import static com.lvt4j.spider4videostation.Consts.AvIdPattern;
 
 import java.io.File;
+import java.nio.charset.Charset;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.commons.io.IOUtils;
 
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.core.JsonParser.Feature;
@@ -15,6 +18,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -89,11 +93,19 @@ public class Utils {
     public interface ThrowableConsumer<T> {
         void accept(T t) throws Throwable;
     }
+    public interface ThrowableFunction<T, R> {
+        R apply(T t) throws Throwable;
+    }
     public interface ThrowableBiConsumer<T, U> {
         void accept(T t, U u) throws Throwable;
     }
     public interface ThrowableBiFunction<T, U, R> {
         R apply(T t, U u) throws Throwable;
+    }
+    
+    @SneakyThrows
+    public static String res(String classpath) {
+        return IOUtils.toString(Utils.class.getResourceAsStream(classpath), Charset.defaultCharset());
     }
 
     public static boolean waitUntil(Supplier<Boolean> until, long timeout) throws InterruptedException,TimeoutException {

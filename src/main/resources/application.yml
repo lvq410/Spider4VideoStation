@@ -46,12 +46,12 @@ staticWebDriverArgs:
 - "--disable-extensions"
 - "--disable-browser-side-navigation"
 - "--disable-dev-shm-usage"
+- "--disable-web-security"
 - "--no-sandbox"
 - "--start-maximized"
 - "--enable-automation"
-
+staticMode: xhrSync
 staticLoadTimeoutMillis: 60000
-
 staticChromeDownloadFolder: /home/seluser/Downloads
 
 cacheMaxSize: 1073741824

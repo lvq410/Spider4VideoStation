@@ -5,7 +5,6 @@ import static com.lvt4j.spider4videostation.Consts.PluginTestUseTitle;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
@@ -13,7 +12,6 @@ import java.util.Map;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import javax.annotation.PostConstruct;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
@@ -39,12 +37,7 @@ import lombok.Cleanup;
 @RequestMapping("plugin")
 public class PluginController {
 
-    private String tpl_loader;
-    
-    @PostConstruct
-    public void init() throws Exception {
-        tpl_loader = IOUtils.toString(PluginController.class.getResourceAsStream("/plugin/tpl_loader.sh"), Charset.defaultCharset());
-    }
+    private static final String Tpl_Loader = Utils.res("/plugin/tpl_loader.sh");
     
     @GetMapping
     public void plugin(HttpServletResponse response,
@@ -91,7 +84,7 @@ public class PluginController {
             .queryParam("pluginId", plugin.id)
             .queryParam("publishPrefix", publishPrefix)
             .toUriString();
-        String loaderCnt = tpl_loader.replace("@@SearchUrl@@", searchUrl);
+        String loaderCnt = Tpl_Loader.replace("@@SearchUrl@@", searchUrl);
         zioOut.putNextEntry(new ZipEntry(plugin.id+"/loader.sh"));
         IOUtils.write(loaderCnt.getBytes(), zioOut);
         

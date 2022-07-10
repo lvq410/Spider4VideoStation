@@ -36,11 +36,13 @@ public class StaticController {
             @RequestParam String url,
             @RequestParam(value="mediaType",required=false) String mediaTypeStr) throws Throwable {
         byte[] bs = cacher.load(url);
-        if(bs==null) service.downAsCache(url);
-        bs = cacher.load(url);
-        if(bs==null){
-            response.setStatus(404);
-            return;
+        if(bs==null) {
+            bs = service.down(url);
+            if(bs==null){
+                response.setStatus(404);
+                return;
+            }
+            cacher.save(url, bs);
         }
         
         MediaType mediaType = null;

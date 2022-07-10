@@ -25,6 +25,7 @@ import com.lvt4j.spider4videostation.Consts;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.Utils.ThrowableBiConsumer;
 import com.lvt4j.spider4videostation.Utils.ThrowableConsumer;
+import com.lvt4j.spider4videostation.Utils.ThrowableFunction;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,7 +50,7 @@ public class Drivers {
         staticer.destory();
     }
     
-    public void search(ThrowableConsumer<RemoteWebDriver> run) throws Throwable {
+    public void searchDo(ThrowableConsumer<RemoteWebDriver> run) throws Throwable {
         synchronized(searcher){
             searcher();
             run.accept(searcher.driver);
@@ -101,7 +102,7 @@ public class Drivers {
         
         return driver;
     }
-    public void staticOpen(String url, ThrowableConsumer<RemoteWebDriver> run) throws Throwable {
+    public <T> T staticOpen(String url, ThrowableFunction<RemoteWebDriver, T> func) throws Throwable {
         synchronized(staticer){
             Utils.retry(()->{
                 staticer();
@@ -113,7 +114,7 @@ public class Drivers {
                 if(n==1) return true;
                 throw new RuntimeException("staticer open url err", e);
             });
-            run.accept(staticer.driver);
+            return func.apply(staticer.driver);
         }
     }
     public void staticerDestory() {
@@ -139,6 +140,8 @@ public class Drivers {
             .pageLoadTimeout(config.getWebDriverStaticerTimeoutMillis(), TimeUnit.MILLISECONDS);
         
         initCookie(driver);
+        
+        driver.get("about:blank");
         
         return driver;
     }
@@ -196,7 +199,7 @@ public class Drivers {
             if(meta.driver==null) return;
             synchronized(meta){
                 if(meta.driver==null) return;
-                if(System.currentTimeMillis()-meta.latestTouchTime<Consts.WebDriverHeartbeatGap) return;
+                if(System.currentTimeMillis()-meta.latestTouchTime>Consts.WebDriverHeartbeatGap) return;
                 if(log.isTraceEnabled()) log.trace("{} heartbeat", meta.name);
                 meta.driver.executeScript("console.log('heartbeat')");
                 meta.latestTouchTime = System.currentTimeMillis();

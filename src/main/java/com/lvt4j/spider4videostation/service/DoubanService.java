@@ -369,7 +369,7 @@ public class DoubanService implements SpiderService {
     public synchronized LoginState checkLoginSuccess() {
         if(!drivers.isSearcherInited()) throw new ResponseStatusException(BAD_REQUEST, "请先进行登录");
         
-        drivers.search(driver->{
+        drivers.searchDo(driver->{
             Utils.waitUntil(()->{
                 return isLogined(driver);
             }, config.getDoubanLoginWaitTimeoutMillis());
