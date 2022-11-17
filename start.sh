@@ -1,6 +1,8 @@
 #!/bin/sh
 set -e
 
+chmod 777 /etc/hosts
+
 #切换至执行目录
 shellDir=`dirname $0`
 cd $shellDir

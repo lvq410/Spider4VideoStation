@@ -108,7 +108,7 @@ public class Drivers {
         RemoteWebDriver driver = searcher.driver = new RemoteWebDriver(new URL(config.getWebDriverAddr()), options);
         
         driver.manage().timeouts()
-            .implicitlyWait(10, TimeUnit.SECONDS)
+            .implicitlyWait(config.getWebDriverSearcherTimeoutMillis(), TimeUnit.MILLISECONDS)
             .setScriptTimeout(config.getWebDriverSearcherTimeoutMillis(), TimeUnit.MILLISECONDS)
             .pageLoadTimeout(config.getWebDriverSearcherTimeoutMillis(), TimeUnit.MILLISECONDS);
         
@@ -148,7 +148,7 @@ public class Drivers {
         RemoteWebDriver driver = staticer.driver = new RemoteWebDriver(new URL(config.getWebDriverAddr()), options);
         
         driver.manage().timeouts()
-            .implicitlyWait(10, TimeUnit.SECONDS)
+            .implicitlyWait(config.getWebDriverStaticerTimeoutMillis(), TimeUnit.MILLISECONDS)
             .setScriptTimeout(config.getWebDriverStaticerTimeoutMillis(), TimeUnit.MILLISECONDS)
             .pageLoadTimeout(config.getWebDriverStaticerTimeoutMillis(), TimeUnit.MILLISECONDS);
         
