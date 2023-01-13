@@ -2,7 +2,7 @@
 #docker run -p 24444:4444 -p 17900:7900 --shm-size="2g" -u root -e SE_VNC_NO_PASSWORD=1 -e SE_NODE_MAX_SESSIONS=8 -e SE_NODE_OVERRIDE_MAX_SESSIONS=true -e SE_SCREEN_WIDTH=1920 -e SE_SCREEN_HEIGHT=1080 -e SE_SCREEN_DEPTH=16 -v E:\Download\Spider4VideoStationStatic:/home/seluser/Downloads selenium/standalone-chrome:107.0.5304.87-chromedriver-107.0.5304.62-grid-4.6.0-20221104
 
 #本地集成镜像测试docker脚本
-#docker run -p 34444:4444 -p 37900:7900 -p 33333:33333 --shm-size="2g" -e SE_SCREEN_WIDTH=1360 -e SE_SCREEN_HEIGHT=1020 -e SE_SCREEN_DEPTH=24 -e SE_SCREEN_DPI=96 -e javdbOrigin=https://javdb006.com lvq410/spider4videostation:dev1
+#docker run -p 34444:4444 -p 37900:7900 -p 33333:33333 --shm-size="2g" -e javdbOrigin=https://javdb006.com lvq410/spider4videostation:dev1
 
 spring:
   boot.admin.client:

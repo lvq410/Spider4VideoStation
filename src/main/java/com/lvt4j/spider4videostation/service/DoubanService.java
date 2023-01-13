@@ -7,9 +7,13 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SerializationUtils;
@@ -19,6 +23,7 @@ import org.apache.commons.lang3.tuple.Triple;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.Cookie;
 import org.openqa.selenium.remote.RemoteWebDriver;
@@ -37,6 +42,8 @@ import com.lvt4j.spider4videostation.controller.StaticController;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Movie;
 import com.lvt4j.spider4videostation.pojo.Rst;
+import com.lvt4j.spider4videostation.pojo.TvShow;
+import com.lvt4j.spider4videostation.pojo.TvShowEpisode;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -76,13 +83,19 @@ public class DoubanService implements SpiderService {
     public synchronized void search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
         switch(args.type){
         case "movie":
-            searchMovie(publishPrefix, plugin, args, rst);
+            movie_search(publishPrefix, plugin, args, rst);
+            break;
+        case "tvshow":
+            tvshow_search(publishPrefix, plugin, args, rst);
+            break;
+        case "tvshow_episode":
+            tvshow_episode_search(publishPrefix, plugin, args, rst);
             break;
         default: break;
         }
     }
     @SneakyThrows
-    private void searchMovie(String publishPrefix, Plugin plugin, Args args, Rst rst) {
+    private void movie_search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
@@ -134,7 +147,7 @@ public class DoubanService implements SpiderService {
             
             Movie movie = null;
             try{
-                movie = loadItem(publishPrefix, plugin, detailUrl);
+                movie = movie_loadItem(publishPrefix, plugin, detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -158,7 +171,7 @@ public class DoubanService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private Movie loadItem(String publishPrefix, Plugin plugin, String detailUrl) {
+    private Movie movie_loadItem(String publishPrefix, Plugin plugin, String detailUrl) {
         Movie movie = new Movie(plugin.id);
         
         log.info("load detail {}", detailUrl);
@@ -188,7 +201,7 @@ public class DoubanService implements SpiderService {
             if(mainpicA!=null){
                 String mainpicUrl = mainpicA.absUrl("href");
                 if(StringUtils.isNotBlank(mainpicUrl)){
-                    loadBackdrops(publishPrefix, movie, mainpicUrl);
+                    loadBackdrops(mainpicUrl, movie.extra().backdrop, publishPrefix);
                 }
             }
         }
@@ -261,7 +274,422 @@ public class DoubanService implements SpiderService {
         
         return movie;
     }
-    private void loadBackdrops(String publishPrefix, Movie movie, String mainpicUrl) {
+    
+    @SneakyThrows
+    private void tvshow_search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
+        args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
+        
+        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
+            .queryParam("search_text", args.input.title).toUriString();
+        log.info("open search {}", searchUrl);
+        String searchCnt;
+        try{
+            searchCnt = loadPage(searchUrl);
+            if(log.isTraceEnabled()) log.trace("search rst {}", searchCnt);
+        }catch(Exception e){
+            log.error("error on search {}", searchUrl, e);
+            return;
+        }
+        
+        Document doc = Jsoup.parse(searchCnt);
+        doc.setBaseUri(searchUrl);
+        
+        int rstNum = 0;
+        
+        Elements items = doc.select("div.item-root");
+        for(Element item : items){
+            Element detailA = item.selectFirst("a");
+            if(detailA==null) continue;
+            String detailUrl = detailA.absUrl("href");
+            if(StringUtils.isBlank(detailUrl)) continue;
+            if(!detailUrl.startsWith(config.getDoubanMovieItemPatterm())) continue;
+            Element detailDiv = item.selectFirst("div.detail");
+            if(detailDiv==null) continue;
+            
+            //提取标题
+            String title = null;
+            Element titleDiv = detailDiv.selectFirst("div.title");
+            if(titleDiv!=null) {
+                title = StringUtils.strip(titleDiv.text().trim(), "　");
+                if(title.indexOf('(')>0){
+                    title = title.substring(0, title.indexOf('(')).trim();
+                }
+            }
+            
+            //提取竖版图片备用
+            String coverUrl = null;
+            Element coverImg = detailA.selectFirst("img");
+            if(coverImg!=null) {
+                coverUrl = coverImg.absUrl("src");
+                if(StringUtils.isNotBlank(coverUrl)){
+                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
+                }
+            }
+            
+            TvShow tvShow = null;
+            try{
+                tvShow = tvshow_loadItem(publishPrefix, plugin, detailUrl);
+            }catch(Exception e){
+                log.error("error load detail {}", detailUrl, e);
+                continue;
+            }
+            
+            if(tvShow==null){ //未从详情页提取出信息
+                if(StringUtils.isNotBlank(title) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
+                    //用列表上的数据
+                    tvShow = new TvShow(plugin.id);
+                    if(StringUtils.isNotBlank(title)) tvShow.title = title;
+                    if(StringUtils.isNotBlank(coverUrl)) {
+                        tvShow.extra().poster.add(0, coverUrl);
+                        tvShow.extra().backdrop.add(0, coverUrl);
+                    }
+                }else{
+                    continue;
+                }
+            }
+            
+            rst.result.add(tvShow);
+            if(args.reachLimit(++rstNum)) break;
+        }
+    }
+    private TvShow tvshow_loadItem(String publishPrefix, Plugin plugin, String detailUrl) {
+        TvShow tvShow = new TvShow(plugin.id);
+        
+        log.info("load detail {}", detailUrl);
+        String detailCnt = loadPage(detailUrl);
+        if(log.isTraceEnabled()) log.trace("load detail cnt {}", detailCnt);
+        Document detailHtml = Jsoup.parse(detailCnt);
+        
+        Element contentDiv = detailHtml.selectFirst("#content");
+        if(contentDiv==null) return null;
+        
+        Element titleSpan = contentDiv.selectFirst("h1 span");
+        if(titleSpan!=null){
+            tvShow.title = StringUtils.strip(titleSpan.text().trim(), "　");
+        }
+        
+        Element mainpicDiv = contentDiv.selectFirst("#mainpic");
+        if(mainpicDiv!=null){
+            Element mainpicImg = mainpicDiv.selectFirst("img");
+            if(mainpicImg!=null){
+                String posterUrl = mainpicImg.absUrl("src");
+                if(StringUtils.isNotBlank(posterUrl)){
+                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl);
+                    tvShow.extra().poster.add(posterUrl);
+                }
+            }
+            Element mainpicA = mainpicDiv.selectFirst("a");
+            if(mainpicA!=null){
+                String mainpicUrl = mainpicA.absUrl("href");
+                if(StringUtils.isNotBlank(mainpicUrl)){
+                    loadBackdrops(mainpicUrl, tvShow.extra().backdrop, publishPrefix);
+                }
+            }
+        }
+        
+        Elements pls = contentDiv.select("#info span.pl");
+        for(Element pl : pls){
+            String name = pl.text().trim();
+            if(StringUtils.isBlank(name)) continue;
+            
+            switch(name){
+            case "上映日期:":
+            case "首播:":
+                Element initialReleaseDateSpan = contentDiv.selectFirst("#info span[property='v:initialReleaseDate']");
+                if(initialReleaseDateSpan!=null){
+                    String initialReleaseDate = initialReleaseDateSpan.text().trim();
+                    if(StringUtils.isNotBlank(initialReleaseDate)){
+                        if(initialReleaseDate.indexOf('(')>0) initialReleaseDate = initialReleaseDate.substring(0, initialReleaseDate.indexOf('('));
+                        tvShow.original_available = initialReleaseDate;
+                    }
+                }
+                break;
+            default: break;
+            }
+        }
+        
+        Element summarySpan = contentDiv.selectFirst("span[property='v:summary']");
+        if(summarySpan!=null){
+            tvShow.summary = summarySpan.text().trim();
+        }
+        
+        return tvShow;
+    }
+    
+    @SneakyThrows
+    private void tvshow_episode_search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
+        args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
+        
+        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
+            .queryParam("search_text", args.input.title).toUriString();
+        log.info("open search {}", searchUrl);
+        String searchCnt;
+        try{
+            searchCnt = loadPage(searchUrl);
+            if(log.isTraceEnabled()) log.trace("search rst {}", searchCnt);
+        }catch(Exception e){
+            log.error("error on search {}", searchUrl, e);
+            return;
+        }
+        
+        Document doc = Jsoup.parse(searchCnt);
+        doc.setBaseUri(searchUrl);
+        
+        int rstNum = 0;
+        
+        Elements items = doc.select("div.item-root");
+        for(Element item : items){
+            Element detailA = item.selectFirst("a");
+            if(detailA==null) continue;
+            String detailUrl = detailA.absUrl("href");
+            if(StringUtils.isBlank(detailUrl)) continue;
+            if(!detailUrl.startsWith(config.getDoubanMovieItemPatterm())) continue;
+            Element detailDiv = item.selectFirst("div.detail");
+            if(detailDiv==null) continue;
+            
+            //提取标题
+            String title = null;
+            Element titleDiv = detailDiv.selectFirst("div.title");
+            if(titleDiv!=null) {
+                title = StringUtils.strip(titleDiv.text().trim(), "　");
+                if(title.indexOf('(')>0){
+                    title = title.substring(0, title.indexOf('(')).trim();
+                }
+            }
+            
+            //提取竖版图片备用
+            String coverUrl = null;
+            Element coverImg = detailA.selectFirst("img");
+            if(coverImg!=null) {
+                coverUrl = coverImg.absUrl("src");
+                if(StringUtils.isNotBlank(coverUrl)){
+                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
+                }
+            }
+            
+            List<TvShowEpisode> episodes = null;
+            try{
+                episodes = tvshow_episode_loadItem(publishPrefix, plugin, detailUrl, args.input.season, args.input.episode);
+            }catch(Exception e){
+                log.error("error load detail {}", detailUrl, e);
+                continue;
+            }
+            
+//            if(episodes==null){ //未从详情页提取出信息
+//                if(StringUtils.isNotBlank(title) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
+//                    //用列表上的数据
+//                    TvShowEpisode episode = new TvShowEpisode(plugin.id);
+//                    if(StringUtils.isNotBlank(title)) episode.title = title;
+//                    if(StringUtils.isNotBlank(coverUrl)) {
+//                        episode.extra().poster.add(0, coverUrl);
+//                        episode.extra().backdrop.add(0, coverUrl);
+//                    }
+//                    episodes = Arrays.asList(episode);
+//                }else{
+//                    continue;
+//                }
+//            }
+            
+            rst.result.addAll(episodes);
+            if(args.reachLimit(++rstNum)) break;
+        }
+    }
+    private List<TvShowEpisode> tvshow_episode_loadItem(String publishPrefix, Plugin plugin, String detailUrl, Integer season, Integer epIdx) {
+        List<TvShowEpisode> episodes = new LinkedList<>();
+        TvShowEpisode base = new TvShowEpisode(plugin.id);
+        if(season!=null) base.season = season;
+        TvShow tvShow = new TvShow(plugin.id);
+        
+        log.info("load detail {}", detailUrl);
+        String detailCnt = loadPage(detailUrl);
+        if(log.isTraceEnabled()) log.trace("load detail cnt {}", detailCnt);
+        Document detailHtml = Jsoup.parse(detailCnt); detailHtml.setBaseUri(detailUrl);
+        
+        Element contentDiv = detailHtml.selectFirst("#content");
+        if(contentDiv==null) return episodes;
+        
+        Element titleSpan = contentDiv.selectFirst("h1 span");
+        if(titleSpan!=null){
+            tvShow.title = base.title = StringUtils.strip(titleSpan.text().trim(), "　");
+        }
+        
+        Element mainpicDiv = contentDiv.selectFirst("#mainpic");
+        if(mainpicDiv!=null){
+            Element mainpicImg = mainpicDiv.selectFirst("img");
+            if(mainpicImg!=null){
+                String posterUrl = mainpicImg.absUrl("src");
+                if(StringUtils.isNotBlank(posterUrl)){
+                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl);
+                    base.extra().poster.add(posterUrl);
+                    tvShow.extra().poster.add(posterUrl);
+                }
+            }
+            Element mainpicA = mainpicDiv.selectFirst("a");
+            if(mainpicA!=null){
+                String mainpicUrl = mainpicA.absUrl("href");
+                if(StringUtils.isNotBlank(mainpicUrl)){
+                    loadBackdrops(mainpicUrl, tvShow.extra().backdrop, publishPrefix);
+                }
+            }
+        }
+        
+        Elements pls = contentDiv.select("#info span.pl");
+        for(Element pl : pls){
+            String name = pl.text().trim();
+            if(StringUtils.isBlank(name)) continue;
+            
+            switch(name){
+            case "导演":
+                Elements directorAs = pl.nextElementSibling().select("a");
+                for(Element directorA : directorAs){
+                    String director = directorA.text().trim();
+                    if(StringUtils.isBlank(director)) continue;
+                    base.director.add(director);
+                }
+                break;
+            case "编剧":
+                Elements writerAs = pl.nextElementSibling().select("a");
+                for(Element writerA : writerAs){
+                    String writer = writerA.text().trim();
+                    if(StringUtils.isBlank(writer)) continue;
+                    base.writer.add(writer);
+                }
+                break;
+            case "主演":
+                Elements actorAs = pl.nextElementSibling().select("a[rel='v:starring']");
+                for(Element actorA : actorAs){
+                    String actor = actorA.text().trim();
+                    if(StringUtils.isBlank(actor)) continue;
+                    base.actor.add(actor);
+                }
+                break;
+            case "类型:":
+                Elements genreSpans = contentDiv.select("#info span[property='v:genre']");
+                for(Element genreSpan : genreSpans){
+                    String genre = genreSpan.text().trim();
+                    if(StringUtils.isBlank(genre)) continue;
+                    base.genre.add(genre);
+                }
+                break;
+            case "首播:":
+            case "上映日期:":
+                Element initialReleaseDateSpan = contentDiv.selectFirst("#info span[property='v:initialReleaseDate']");
+                if(initialReleaseDateSpan!=null){
+                    String initialReleaseDate = initialReleaseDateSpan.text().trim();
+                    if(StringUtils.isNotBlank(initialReleaseDate)){
+                        if(initialReleaseDate.indexOf('(')>0) initialReleaseDate = initialReleaseDate.substring(0, initialReleaseDate.indexOf('('));
+                        tvShow.original_available = base.original_available = initialReleaseDate;
+                    }
+                }
+                break;
+            case "季数:":
+                Node seasonNode = pl.nextSibling();
+                if(seasonNode!=null){
+                    String seasonStr = seasonNode.toString().trim();
+                    if(NumberUtils.isDigits(seasonStr)){
+                        base.season = Integer.valueOf(seasonStr);
+                    }
+                }
+                break;
+            default: break;
+            }
+        }
+        Element ratingStrong = contentDiv.selectFirst("strong[property='v:average']");
+        if(ratingStrong!=null){
+            String rating = ratingStrong.text().trim();
+            if(NumberUtils.isParsable(rating)){
+                BigDecimal rate = new BigDecimal(rating)
+                    .setScale(1, RoundingMode.HALF_UP).stripTrailingZeros();
+                base.extra().rating(rate);
+            }
+        }
+        
+        Element summarySpan = contentDiv.selectFirst("span[property='v:summary']");
+        if(summarySpan!=null){
+            tvShow.summary = summarySpan.text().trim();
+        }
+        
+        base.extra().tvshow = tvShow;
+        
+        Elements epAs = contentDiv.select(".episode_list a.item");
+        Map<Integer, Element> epAsMap = IntStream.range(0, epAs.size()).mapToObj(i->i).collect(Collectors.toMap(i->i+1, i->epAs.get(i)));
+        Map<Integer, Element> toLoadEpAs = new HashMap<>();
+        if(epAsMap.containsKey(epIdx)){
+            toLoadEpAs.put(epIdx, epAsMap.get(epIdx));
+        }else{
+            toLoadEpAs.putAll(epAsMap);
+        }
+        
+        toLoadEpAs.forEach((idx, a)->{
+            TvShowEpisode episode = tvshow_episode_loadEpisode(a.absUrl("href"), base);
+            episode.episode = idx;
+            episodes.add(episode);
+        });
+        
+        return episodes;
+    }
+    private TvShowEpisode tvshow_episode_loadEpisode(String episodeUrl, TvShowEpisode base) {
+        TvShowEpisode episode = SerializationUtils.clone(base);
+        
+        log.info("load episode {}", episodeUrl);
+        String episodeCnt = loadPage(episodeUrl);
+        if(log.isTraceEnabled()) log.trace("load episode cnt {}", episodeCnt);
+        Document episodeHtml = Jsoup.parse(episodeCnt);
+        
+        Element contentDiv = episodeHtml.selectFirst("#content");
+        if(contentDiv==null) return null;
+        
+        String nameCn=null,nameOrigin=null;
+        
+        Elements epInfoLis = contentDiv.select("ul.ep-info li");
+        for(Element li : epInfoLis){
+            Element nameSpan = li.selectFirst("span");
+            if(nameSpan==null) continue;
+            String name = nameSpan.text().trim();
+            if(StringUtils.isBlank(name)) continue;
+            
+            Element valueSpan,hideSpan;
+            switch(name){
+            case "本集中文名:":
+                valueSpan = li.selectFirst("span.all");
+                if(valueSpan==null) continue;
+                nameCn = valueSpan.text().trim();
+                break;
+            case "本集原名:":
+                valueSpan = li.selectFirst("span.all");
+                if(valueSpan==null) continue;
+                nameOrigin = valueSpan.text().trim();
+                break;
+            case "播放时间:":
+                valueSpan = li.selectFirst("span.all");
+                if(valueSpan==null) continue;
+                episode.original_available = valueSpan.text().trim();
+                break;
+            case "剧情简介:":
+                valueSpan = li.selectFirst("span.all");
+                if(valueSpan==null) continue;
+                episode.summary = valueSpan.text().trim();
+                hideSpan = li.selectFirst("span.hide");
+                if(hideSpan!=null) episode.summary += hideSpan.text().trim();
+                break;
+            }
+        }
+        if(StringUtils.equals(nameCn, nameOrigin)){
+            episode.tagline = nameOrigin;
+        }else{
+            if(StringUtils.isNotBlank(nameCn) && StringUtils.isNotBlank(nameOrigin)){
+                episode.tagline = nameCn+"　"+nameOrigin;
+            }else if(StringUtils.isNotBlank(nameCn) && StringUtils.isBlank(nameOrigin)){
+                episode.tagline = nameCn;
+            }else if(StringUtils.isBlank(nameCn) && StringUtils.isNotBlank(nameOrigin)){
+                episode.tagline = nameOrigin;
+            }
+        }
+        
+        return episode;
+    }
+    
+    private void loadBackdrops(String mainpicUrl, List<String> backdrops, String publishPrefix) {
         log.info("load backdrop list {}", mainpicUrl);
 //        String mainpicCnt = loadPage(mainpicUrl);
         String mainpicCnt = fetchPage(mainpicUrl);
@@ -309,7 +737,7 @@ public class DoubanService implements SpiderService {
         coverAndSizes = new ArrayList<>(coverAndSizes.subList(0, Math.min(coverAndSizes.size(), 5)));
         //顺序随机下
         Collections.shuffle(coverAndSizes);
-        movie.extra().backdrop.addAll(coverAndSizes.stream().map(p->p.getLeft()).collect(Collectors.toList()));
+        backdrops.addAll(coverAndSizes.stream().map(p->p.getLeft()).collect(Collectors.toList()));
     }
     
     @SneakyThrows

@@ -18,15 +18,17 @@
         </p>
         <p>
             插件测试：
-            <select id="pluginId">@@PluginIds@@</select>
+            <select id="pluginId" onchange="onPluginSelect()"></select>
             <br>
             类型：
-            <select id="type"><option>movie</option></select>
+            <select id="type" onchange="onTypeSelect()"></select>
             语言：
-            <select id="lang"><option value="chs">简中</option><option value="jpn">日语</option></select>
+            <select id="lang"></select>
             <br>
-            关键词：
-            <input id="title"/>
+            关键词：<input id="title"/>
+            <span id="seasonSpan">季：<input id="season" type="number"/></span>
+            <span id="episodeSpan">集：<input id="episode" type="number"/></span>
+            <br>
             条数：
             <input id="limit" type="number" value="1"/>
             <br>
@@ -35,6 +37,13 @@
         <textarea id="searchRst" placeholder="搜索结果" style="width:1000px;height:500px;"></textarea>
     </body>
     <script>
+var Plugins = @@Plugins@@;
+var pluginIdOptionHtml = '';
+for(var id in Plugins){
+    pluginIdOptionHtml += '<option>'+id+'</option>'
+}
+document.getElementById('pluginId').innerHTML = pluginIdOptionHtml;
+onPluginSelect();
 function publishPrefix(){
     return location.href;
 }
@@ -83,17 +92,59 @@ function doubanCheckLoginSuc(){
         document.body.innerHTML = '<h1>登录失败！</h1>';
     });
 }
+function onPluginSelect(){
+    var pluginId = document.getElementById('pluginId').value;
+    var info = Plugins[pluginId];
+    
+    var typeOptionHtml = '';
+    info.types.forEach(function(type){
+        typeOptionHtml += '<option>'+type+'</option>';
+    });
+    document.getElementById('type').innerHTML = typeOptionHtml;
+    if(!document.getElementById('type').value) document.getElementById('type').value = info.types[0];
+    
+    var langOptionHtml = '';
+    info.languages.forEach(function(lang){
+        langOptionHtml += '<option>'+lang+'</option>';
+    });
+    document.getElementById('lang').innerHTML = langOptionHtml;
+    if(!document.getElementById('lang').value) document.getElementById('lang').value = info.languages[0];
+    onTypeSelect();
+}
+function onTypeSelect(){
+    var type = document.getElementById('type').value;
+    switch(type){
+    case 'movie':
+    case 'tvshow':
+        document.getElementById('seasonSpan').style='display:none';
+        document.getElementById('episodeSpan').style='display:none';
+        document.getElementById('season').value = '';
+        document.getElementById('episode').value = '';
+        break;
+    case 'tvshow_episode':
+        document.getElementById('seasonSpan').style='display:inline';
+        document.getElementById('episodeSpan').style='display:inline';
+        document.getElementById('season').value = '1';
+        document.getElementById('episode').value = '1';
+        break;
+    }
+}
 function search(){
     var pluginId = document.getElementById('pluginId').value;
     var type = document.getElementById('type').value;
     var lang = document.getElementById('lang').value;
     var title = document.getElementById('title').value;
+    var season = document.getElementById('season').value;
+    var episode = document.getElementById('episode').value;
     var limit = document.getElementById('limit').value;
     if(!title) {
         document.getElementById('searchRst').value = '关键词不能为空';
         return;
     }
-    var input = JSON.stringify({'title':title});
+    var input = {'title':title};
+    if(season) input['season']=season;
+    if(episode) input['episode']=episode;
+    input = JSON.stringify(input);
     
     var body = '--type '+type+' --lang '+lang+' --input '+input+' --limit '+limit;
     

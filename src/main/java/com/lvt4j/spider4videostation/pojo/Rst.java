@@ -10,5 +10,5 @@ import java.util.List;
  */
 public class Rst {
     public boolean success;
-    public List<Movie> result = Collections.synchronizedList(new LinkedList<>());
+    public List<Object> result = Collections.synchronizedList(new LinkedList<>());
 }

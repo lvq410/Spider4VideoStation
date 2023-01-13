@@ -2,6 +2,7 @@ package com.lvt4j.spider4videostation.pojo;
 
 import static com.lvt4j.spider4videostation.Utils.ObjectMapper;
 
+import java.io.Serializable;
 import java.util.Scanner;
 
 import org.apache.commons.lang3.BooleanUtils;
@@ -26,9 +27,14 @@ public class Args {
     public int limit = 1;
     public boolean allowguess;
     
-    public static class Input {
+    public static class Input implements Serializable {
+        private static final long serialVersionUID = 8433373026019869079L;
+        
         public String title;
         public String original_available;
+        
+        public Integer season;
+        public Integer episode;
         
         public String year() {
             if(StringUtils.isBlank(original_available)) return null;

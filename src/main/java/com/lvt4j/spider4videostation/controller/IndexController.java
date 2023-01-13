@@ -1,8 +1,11 @@
 package com.lvt4j.spider4videostation.controller;
 
+import static com.lvt4j.spider4videostation.Utils.ObjectMapper;
+
 import java.nio.charset.Charset;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 import org.apache.commons.io.IOUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,9 +30,21 @@ public class IndexController {
     @RequestMapping(produces=MediaType.TEXT_HTML_VALUE)
     public String index() throws Exception {
         String indexHtml = IOUtils.toString(IndexController.class.getResourceAsStream("/index.html"), Charset.defaultCharset());
-        String pluginOptions = Stream.of(Plugin.values()).map(p->"<option>"+p.id+"</option>").collect(Collectors.joining(" "));
-        indexHtml = indexHtml.replace("@@PluginIds@@", pluginOptions);
+        indexHtml = indexHtml.replace("@@Plugins@@", ObjectMapper.writeValueAsString(pluginInfos()));
         return indexHtml;
+    }
+    
+    public Map<String, Object> pluginInfos() {
+        Map<String, Object> infos = new LinkedHashMap<>();
+        
+        for(Plugin plugin : Plugin.values()){
+            Map<String, Object> info = new HashMap<>();
+            info.put("types", plugin.types);
+            info.put("languages", plugin.languages);
+            infos.put(plugin.id, info);
+        }
+        
+        return infos;
     }
     
     @RequestMapping("cleanCache")

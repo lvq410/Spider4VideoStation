@@ -6,7 +6,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.ZipEntry;
@@ -15,6 +15,7 @@ import java.util.zip.ZipOutputStream;
 import javax.servlet.http.HttpServletResponse;
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang3.SerializationUtils;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Controller;
@@ -69,12 +70,23 @@ public class PluginController {
         
         Info info = new Info();
         info.id = plugin.id;
-        info.type = plugin.types;
+        info.type = plugin.infoTypes;
         info.language = plugin.languages;
-        for(String type : plugin.types){
+        for(String type : plugin.infoTypes){
             Args.Input input = new Args.Input();
             input.title = PluginTestUseTitle;
-            info.test_example.put(type, input);
+            switch(type){
+            case "tvshow":
+                info.test_example.put(type, input);
+                
+                Args.Input episodeInput = SerializationUtils.clone(input);
+                episodeInput.season = 1; episodeInput.episode = 1;
+                info.test_example.put("tvshow_episode", episodeInput);
+                break;
+            default:
+                info.test_example.put(type, input);
+                break;
+            }
         }
         zioOut.putNextEntry(new ZipEntry(plugin.id+"/INFO"));
         IOUtils.write(Utils.ObjectMapper.writeValueAsBytes(info), zioOut);
@@ -98,7 +110,7 @@ public class PluginController {
         public String entry_file = "loader.sh";
         public List<String> type;
         public List<String> language;
-        public Map<String, Args.Input> test_example = new HashMap<>();
+        public Map<String, Args.Input> test_example = new LinkedHashMap<>();
     }
     
 }

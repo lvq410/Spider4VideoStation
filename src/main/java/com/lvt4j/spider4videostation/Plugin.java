@@ -14,14 +14,15 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum Plugin{
     
-    AV_StrictId(PluginIdPrefix+".AV.StrictId", asList("movie"), asList("jpn"))
-    ,AV_Normal(PluginIdPrefix+".AV.Normal", asList("movie"), asList("jpn"))
+    AV_StrictId(PluginIdPrefix+".AV.StrictId", asList("movie"), asList("movie"), asList("jpn"))
+    ,AV_Normal(PluginIdPrefix+".AV.Normal", asList("movie"), asList("movie"), asList("jpn"))
     
-    ,Douban(PluginIdPrefix+".Douban", asList("movie"), asList("chs"))
+    ,Douban(PluginIdPrefix+".Douban", asList("movie","tvshow", "tvshow_episode"), asList("movie","tvshow"), asList("chs"))
     ;
     
     public final String id;
     public final List<String> types;
+    public final List<String> infoTypes;
     public final List<String> languages;
     
     public static Plugin find(String id) {

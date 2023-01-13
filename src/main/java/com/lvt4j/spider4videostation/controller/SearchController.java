@@ -16,6 +16,8 @@ import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Movie;
 import com.lvt4j.spider4videostation.pojo.Rst;
+import com.lvt4j.spider4videostation.pojo.TvShow;
+import com.lvt4j.spider4videostation.pojo.TvShowEpisode;
 import com.lvt4j.spider4videostation.service.SpiderService;
 
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +59,24 @@ public class SearchController {
         
         if(PluginTestUseTitle.equals(args.input.title)){
             rst.success = true;
-            rst.result.add(Movie.testUse(pluginId));
+            switch(args.type){
+            case "movie":
+                rst.result.add(Movie.testUse(pluginId));
+                break;
+            case "tvshow":
+                rst.result.add(TvShow.testUse(pluginId));
+                break;
+            case "tvshow_episode":
+                TvShowEpisode episode = TvShowEpisode.testUse(pluginId);
+                if(args.input.season!=null) episode.season = args.input.season;
+                if(args.input.episode!=null) episode.episode = args.input.episode;
+                episode.extra().tvshow = TvShow.testUse(pluginId);
+                rst.result.add(episode);
+                break;
+            default:
+                break;
+            }
+            
             return rst;
         }
         
