@@ -3,11 +3,16 @@ package com.lvt4j.spider4videostation;
 import static com.lvt4j.spider4videostation.Consts.AvIdPattern;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.security.MessageDigest;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import javax.xml.bind.DatatypeConverter;
 
 import org.apache.commons.io.IOUtils;
 
@@ -18,6 +23,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
+import lombok.Cleanup;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 
@@ -129,6 +135,48 @@ public class Utils {
             Thread.sleep(100);
             waitedTime = System.currentTimeMillis()-beginTime;
         }while(lastPeekModify!=file.lastModified() || lastPeekLength!=file.length());
+    }
+    
+    public static class MD5 {
+
+        @SneakyThrows
+        public static String encode(String text) {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            md.update(text.getBytes());
+            return DatatypeConverter.printHexBinary(md.digest());
+        }
+
+        public static String encode(File file) throws Exception {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            FileInputStream is = new FileInputStream(file);
+            byte[] buff = new byte[1024];
+            int len;
+            while ((len = is.read(buff)) > 0)
+                md.update(buff, 0, len);
+            is.close();
+            return DatatypeConverter.printHexBinary(md.digest());
+        }
+
+        @SneakyThrows
+        public static String encode(byte[] bytes) {
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            md.update(bytes);
+            return DatatypeConverter.printHexBinary(md.digest());
+        }
+        
+        /** 计算结束is会被关闭 */
+        @SneakyThrows
+        public static String encode(InputStream is) {
+            @Cleanup InputStream i = is;
+            MessageDigest md = MessageDigest.getInstance("MD5");
+            byte[] buf = new byte[1024];
+            int len = 0;
+            while ((len=i.read(buf))!=-1) {
+                md.update(buf, 0, len);
+            }
+            return DatatypeConverter.printHexBinary(md.digest());
+        }
+        
     }
     
 }

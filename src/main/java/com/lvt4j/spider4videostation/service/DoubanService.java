@@ -617,12 +617,15 @@ public class DoubanService implements SpiderService {
         if(epAsMap.containsKey(epIdx)){
             toLoadEpAs.put(epIdx, epAsMap.get(epIdx));
         }else{
-            toLoadEpAs.putAll(epAsMap);
+            if(epIdx==null){
+                toLoadEpAs.putAll(epAsMap);
+            }
         }
         
         toLoadEpAs.forEach((idx, a)->{
             TvShowEpisode episode = tvshow_episode_loadEpisode(a.absUrl("href"), base);
             episode.episode = idx;
+            if(StringUtils.isBlank(episode.tagline)) episode.tagline = "第"+idx+"集";
             episodes.add(episode);
         });
         
@@ -674,7 +677,7 @@ public class DoubanService implements SpiderService {
                 break;
             }
         }
-        if(StringUtils.equals(nameCn, nameOrigin)){
+        if(StringUtils.isNotBlank(nameOrigin) && StringUtils.equals(nameCn, nameOrigin)){
             episode.tagline = nameOrigin;
         }else{
             if(StringUtils.isNotBlank(nameCn) && StringUtils.isNotBlank(nameOrigin)){
@@ -686,13 +689,15 @@ public class DoubanService implements SpiderService {
             }
         }
         
+        if(StringUtils.isBlank(episode.summary)) episode.summary = base.summary;
+        
         return episode;
     }
     
     private void loadBackdrops(String mainpicUrl, List<String> backdrops, String publishPrefix) {
         log.info("load backdrop list {}", mainpicUrl);
-//        String mainpicCnt = loadPage(mainpicUrl);
-        String mainpicCnt = fetchPage(mainpicUrl);
+        String mainpicCnt = loadPage(mainpicUrl);
+//        String mainpicCnt = fetchPage(mainpicUrl);
         if(log.isTraceEnabled()) log.trace("load backdrops cnt {}", mainpicCnt);
         
         Document mainpicDoc = Jsoup.parse(mainpicCnt);

@@ -17,6 +17,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.lvt4j.spider4videostation.Config;
+import com.lvt4j.spider4videostation.Utils;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -103,6 +104,8 @@ public class FileCacher {
                 .replaceAll("[>]", "＞").replaceAll("[|]", "｜");
         
         if(!name.endsWith(".cache")) name += ".cache";
+        
+        if(name.length()>200) name = Utils.MD5.encode(name.getBytes());
         
         return new File(ctxFolder, name);
     }
