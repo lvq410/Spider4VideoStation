@@ -28,7 +28,7 @@ import lombok.extern.slf4j.Slf4j;
  */
 @Slf4j
 @Service
-@ManagedResource(objectName="!cache:type=FileCacher")
+@ManagedResource(objectName="!cache:name=FileCacher")
 public class FileCacher {
 
     @Autowired
@@ -105,7 +105,7 @@ public class FileCacher {
         
         if(!name.endsWith(".cache")) name += ".cache";
         
-        if(name.length()>200) name = Utils.MD5.encode(name.getBytes());
+        if(name.length()>200) name = Utils.MD5.encode(name);
         
         return new File(ctxFolder, name);
     }

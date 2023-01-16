@@ -13,7 +13,7 @@ import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.PluginType;
 import com.lvt4j.spider4videostation.service.FileCacher;
 
 /**
@@ -37,11 +37,11 @@ public class IndexController {
     public Map<String, Object> pluginInfos() {
         Map<String, Object> infos = new LinkedHashMap<>();
         
-        for(Plugin plugin : Plugin.values()){
+        for(PluginType plugin : PluginType.values()){
             Map<String, Object> info = new HashMap<>();
-            info.put("types", plugin.types);
+            info.put("types", plugin.searchTypes);
             info.put("languages", plugin.languages);
-            infos.put(plugin.id, info);
+            infos.put(plugin.name, info);
         }
         
         return infos;

@@ -35,7 +35,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import com.lvt4j.spider4videostation.Config;
 import com.lvt4j.spider4videostation.Consts;
-import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.PluginType;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.controller.DoubanController;
 import com.lvt4j.spider4videostation.controller.StaticController;
@@ -72,30 +72,30 @@ public class DoubanService implements SpiderService {
     private DoubanController doubanController;
     
     @Override
-    public boolean support(Plugin plugin, Args args) {
-        if(Plugin.Douban!=plugin) return false;
-        if(!plugin.types.contains(args.type)) return false;
+    public boolean support(PluginType plugin, Args args) {
+        if(PluginType.Douban!=plugin) return false;
+        if(!plugin.searchTypes.contains(args.type)) return false;
         if(!plugin.languages.contains(args.lang)) return false;
         return true;
     }
 
     @Override
-    public synchronized void search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
+    public synchronized void search(String pluginId, String publishPrefix, PluginType pluginType, Args args, Rst rst) {
         switch(args.type){
         case "movie":
-            movie_search(publishPrefix, plugin, args, rst);
+            movie_search(pluginId, publishPrefix, args, rst);
             break;
         case "tvshow":
-            tvshow_search(publishPrefix, plugin, args, rst);
+            tvshow_search(pluginId, publishPrefix, args, rst);
             break;
         case "tvshow_episode":
-            tvshow_episode_search(publishPrefix, plugin, args, rst);
+            tvshow_episode_search(pluginId, publishPrefix, args, rst);
             break;
         default: break;
         }
     }
     @SneakyThrows
-    private void movie_search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
+    private void movie_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
@@ -147,7 +147,7 @@ public class DoubanService implements SpiderService {
             
             Movie movie = null;
             try{
-                movie = movie_loadItem(publishPrefix, plugin, detailUrl);
+                movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -156,7 +156,7 @@ public class DoubanService implements SpiderService {
             if(movie==null){ //未从详情页提取出信息
                 if(StringUtils.isNotBlank(title) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
                     //用列表上的数据
-                    movie = new Movie(plugin.id);
+                    movie = new Movie(pluginId);
                     if(StringUtils.isNotBlank(title)) movie.title = title;
                     if(StringUtils.isNotBlank(coverUrl)) {
                         movie.extra().poster.add(0, coverUrl);
@@ -171,8 +171,8 @@ public class DoubanService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private Movie movie_loadItem(String publishPrefix, Plugin plugin, String detailUrl) {
-        Movie movie = new Movie(plugin.id);
+    private Movie movie_loadItem(String pluginId, String publishPrefix, String detailUrl) {
+        Movie movie = new Movie(pluginId);
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);
@@ -276,7 +276,7 @@ public class DoubanService implements SpiderService {
     }
     
     @SneakyThrows
-    private void tvshow_search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
+    private void tvshow_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
@@ -328,7 +328,7 @@ public class DoubanService implements SpiderService {
             
             TvShow tvShow = null;
             try{
-                tvShow = tvshow_loadItem(publishPrefix, plugin, detailUrl);
+                tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -337,7 +337,7 @@ public class DoubanService implements SpiderService {
             if(tvShow==null){ //未从详情页提取出信息
                 if(StringUtils.isNotBlank(title) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
                     //用列表上的数据
-                    tvShow = new TvShow(plugin.id);
+                    tvShow = new TvShow(pluginId);
                     if(StringUtils.isNotBlank(title)) tvShow.title = title;
                     if(StringUtils.isNotBlank(coverUrl)) {
                         tvShow.extra().poster.add(0, coverUrl);
@@ -352,8 +352,8 @@ public class DoubanService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private TvShow tvshow_loadItem(String publishPrefix, Plugin plugin, String detailUrl) {
-        TvShow tvShow = new TvShow(plugin.id);
+    private TvShow tvshow_loadItem(String pluginId, String publishPrefix, String detailUrl) {
+        TvShow tvShow = new TvShow(pluginId);
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);
@@ -417,7 +417,7 @@ public class DoubanService implements SpiderService {
     }
     
     @SneakyThrows
-    private void tvshow_episode_search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
+    private void tvshow_episode_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
@@ -469,7 +469,7 @@ public class DoubanService implements SpiderService {
             
             List<TvShowEpisode> episodes = null;
             try{
-                episodes = tvshow_episode_loadItem(publishPrefix, plugin, detailUrl, args.input.season, args.input.episode);
+                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -494,11 +494,11 @@ public class DoubanService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private List<TvShowEpisode> tvshow_episode_loadItem(String publishPrefix, Plugin plugin, String detailUrl, Integer season, Integer epIdx) {
+    private List<TvShowEpisode> tvshow_episode_loadItem(String pluginId, String publishPrefix, String detailUrl, Integer season, Integer epIdx) {
         List<TvShowEpisode> episodes = new LinkedList<>();
-        TvShowEpisode base = new TvShowEpisode(plugin.id);
+        TvShowEpisode base = new TvShowEpisode(pluginId);
         if(season!=null) base.season = season;
-        TvShow tvShow = new TvShow(plugin.id);
+        TvShow tvShow = new TvShow(pluginId);
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);

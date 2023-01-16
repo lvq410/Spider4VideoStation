@@ -20,7 +20,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import com.lvt4j.spider4videostation.Config;
-import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.PluginType;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.controller.StaticController;
 import com.lvt4j.spider4videostation.pojo.Args;
@@ -38,7 +38,7 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class JavdbService implements SpiderService {
 
-    private static final List<Plugin> SupportPluginIds = Arrays.asList(Plugin.AV_Normal, Plugin.AV_StrictId);
+    private static final List<PluginType> SupportPluginTypes = Arrays.asList(PluginType.AV_Normal, PluginType.AV_StrictId);
     
     @Autowired
     private Config config;
@@ -53,16 +53,16 @@ public class JavdbService implements SpiderService {
     private Drivers drivers;
     
     @Override
-    public boolean support(Plugin plugin, Args args) {
-        if(!SupportPluginIds.contains(plugin)) return false;
-        if(!plugin.types.contains(args.type)) return false;
+    public boolean support(PluginType plugin, Args args) {
+        if(!SupportPluginTypes.contains(plugin)) return false;
+        if(!plugin.searchTypes.contains(args.type)) return false;
         if(!plugin.languages.contains(args.lang)) return false;
         return true;
     }
     
     @Override
-    public void search(String publishPrefix, Plugin plugin, Args args, Rst rst) {
-        boolean strictAvId = Plugin.AV_StrictId==plugin;
+    public void search(String pluginId, String publishPrefix, PluginType pluginType, Args args, Rst rst) {
+        boolean strictAvId = PluginType.AV_StrictId==pluginType;
         
         String title = args.input.title;
         if(strictAvId) title = Utils.extractAvId(title);
@@ -106,7 +106,7 @@ public class JavdbService implements SpiderService {
             
             Movie movie = null;
             try{
-                movie = loadItem(publishPrefix, plugin, detailUrl);
+                movie = loadItem(pluginId, publishPrefix, pluginType, detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -125,7 +125,7 @@ public class JavdbService implements SpiderService {
             if(movie==null){ //未从详情页提取出信息
                 if(StringUtils.isNotBlank(videoTitle) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
                     //用列表上的数据
-                    movie = new Movie(plugin.id);
+                    movie = new Movie(pluginId);
                     if(StringUtils.isNotBlank(videoTitle)) movie.title = videoTitle;
                     if(StringUtils.isNotBlank(coverUrl)) {
                         movie.extra().poster.add(0, coverUrl);
@@ -145,8 +145,8 @@ public class JavdbService implements SpiderService {
         }
     }
     
-    private Movie loadItem(String publishPrefix, Plugin plugin, String detailUrl) throws Exception {
-        Movie movie = new Movie(plugin.id);
+    private Movie loadItem(String pluginId, String publishPrefix, PluginType plugin, String detailUrl) throws Exception {
+        Movie movie = new Movie(pluginId);
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);

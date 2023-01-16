@@ -11,7 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.PluginType;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Movie;
@@ -37,15 +37,16 @@ public class SearchController {
     @PostMapping
     public Rst search(
             @RequestParam String publishPrefix,
-            @RequestParam String pluginId,
+            @RequestParam("pluginId") String pluginId,
+            @RequestParam("pluginType") String pluginTypeStr,
             @RequestBody String body) throws Throwable {
         log.info("search {}", body);
         
         Rst rst = new Rst();
         
-        Plugin plugin = Plugin.find(pluginId);
-        if(plugin==null) {
-            log.error("unknown pluginId {}", pluginId);
+        PluginType pluginType = PluginType.find(pluginTypeStr);
+        if(pluginType==null) {
+            log.error("unknown pluginType {}", pluginType);
             return rst;
         }
         
@@ -80,8 +81,8 @@ public class SearchController {
             return rst;
         }
         
-        services.stream().filter(s->s.support(plugin, args)).parallel()
-            .forEach(s->s.search(publishPrefix, plugin, args, rst));
+        services.stream().filter(s->s.support(pluginType, args)).parallel()
+            .forEach(s->s.search(pluginId, publishPrefix, pluginType, args, rst));
         
         rst.success = !rst.result.isEmpty();
         

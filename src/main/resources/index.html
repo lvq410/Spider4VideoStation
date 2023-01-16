@@ -18,7 +18,7 @@
         </p>
         <p>
             插件测试：
-            <select id="pluginId" onchange="onPluginSelect()"></select>
+            <select id="pluginType" onchange="onPluginSelect()"></select>
             <br>
             类型：
             <select id="type" onchange="onTypeSelect()"></select>
@@ -38,11 +38,11 @@
     </body>
     <script>
 var Plugins = @@Plugins@@;
-var pluginIdOptionHtml = '';
+var pluginTypeOptionHtml = '';
 for(var id in Plugins){
-    pluginIdOptionHtml += '<option>'+id+'</option>'
+    pluginTypeOptionHtml += '<option>'+id+'</option>'
 }
-document.getElementById('pluginId').innerHTML = pluginIdOptionHtml;
+document.getElementById('pluginType').innerHTML = pluginTypeOptionHtml;
 onPluginSelect();
 function publishPrefix(){
     return location.href;
@@ -93,8 +93,8 @@ function doubanCheckLoginSuc(){
     });
 }
 function onPluginSelect(){
-    var pluginId = document.getElementById('pluginId').value;
-    var info = Plugins[pluginId];
+    var pluginType = document.getElementById('pluginType').value;
+    var info = Plugins[pluginType];
     
     var typeOptionHtml = '';
     info.types.forEach(function(type){
@@ -130,7 +130,8 @@ function onTypeSelect(){
     }
 }
 function search(){
-    var pluginId = document.getElementById('pluginId').value;
+    var pluginType = document.getElementById('pluginType').value;
+    var pluginId = pluginType+'('+location.hostname+')';
     var type = document.getElementById('type').value;
     var lang = document.getElementById('lang').value;
     var title = document.getElementById('title').value;
@@ -150,7 +151,7 @@ function search(){
     
     document.getElementById('btn').disabled=true;
     document.getElementById('searchRst').value = '搜索中...';
-    post('search?pluginId='+pluginId+'&publishPrefix='+encodeURIComponent(publishPrefix()), body, function(rst){
+    post('search?pluginId='+pluginId+'&pluginType='+pluginType+'&publishPrefix='+encodeURIComponent(publishPrefix()), body, function(rst){
         document.getElementById('searchRst').value = JSON.stringify(rst, null, 1);
         document.getElementById('btn').disabled=false;
     })

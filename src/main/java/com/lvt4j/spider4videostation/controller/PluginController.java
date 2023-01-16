@@ -4,6 +4,7 @@ import static com.lvt4j.spider4videostation.Consts.PluginTestUseTitle;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
@@ -24,7 +25,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import com.lvt4j.spider4videostation.Plugin;
+import com.lvt4j.spider4videostation.PluginType;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.pojo.Args;
 
@@ -46,9 +47,12 @@ public class PluginController {
         @Cleanup ByteArrayOutputStream baos = new ByteArrayOutputStream();
         @Cleanup ZipOutputStream zioOut = new ZipOutputStream(baos);
         
-        for(Plugin plugin : Plugin.values()){
-            zioOut.putNextEntry(new ZipEntry(plugin.id+".zip"));
-            IOUtils.write(singlePluginZip(publishPrefix, plugin), zioOut);
+        String host = new URL(publishPrefix).getHost();
+        
+        for(PluginType pluginType : PluginType.values()){
+            String id = pluginType.name+"("+host+")";
+            zioOut.putNextEntry(new ZipEntry(id+".zip"));
+            IOUtils.write(singlePluginZip(id, publishPrefix, pluginType), zioOut);
         }
         
         zioOut.close(); baos.close();
@@ -64,15 +68,15 @@ public class PluginController {
         IOUtils.write(data, response.getOutputStream());
     }
     
-    byte[] singlePluginZip(String publishPrefix, Plugin plugin) throws IOException {
+    byte[] singlePluginZip(String id, String publishPrefix, PluginType pluginType) throws IOException {
         @Cleanup ByteArrayOutputStream baos = new ByteArrayOutputStream();
         @Cleanup ZipOutputStream zioOut = new ZipOutputStream(baos);
         
         Info info = new Info();
-        info.id = plugin.id;
-        info.type = plugin.infoTypes;
-        info.language = plugin.languages;
-        for(String type : plugin.infoTypes){
+        info.id = id;
+        info.type = pluginType.infoTypes;
+        info.language = pluginType.languages;
+        for(String type : pluginType.infoTypes){
             Args.Input input = new Args.Input();
             input.title = PluginTestUseTitle;
             switch(type){
@@ -88,16 +92,17 @@ public class PluginController {
                 break;
             }
         }
-        zioOut.putNextEntry(new ZipEntry(plugin.id+"/INFO"));
+        zioOut.putNextEntry(new ZipEntry(id+"/INFO"));
         IOUtils.write(Utils.ObjectMapper.writeValueAsBytes(info), zioOut);
         
         String searchUrl = UriComponentsBuilder.fromHttpUrl(publishPrefix)
             .path("search")
-            .queryParam("pluginId", plugin.id)
+            .queryParam("pluginId", id)
+            .queryParam("pluginType", pluginType.name)
             .queryParam("publishPrefix", publishPrefix)
             .toUriString();
         String loaderCnt = Tpl_Loader.replace("@@SearchUrl@@", searchUrl);
-        zioOut.putNextEntry(new ZipEntry(plugin.id+"/loader.sh"));
+        zioOut.putNextEntry(new ZipEntry(id+"/loader.sh"));
         IOUtils.write(loaderCnt.getBytes(), zioOut);
         
         zioOut.close(); baos.close();
