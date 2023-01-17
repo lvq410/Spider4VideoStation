@@ -5,6 +5,8 @@ import static com.lvt4j.spider4videostation.Consts.AvIdPattern;
 import java.io.File;
 import java.nio.charset.Charset;
 import java.security.MessageDigest;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeoutException;
 import java.util.function.Supplier;
 import java.util.regex.Matcher;
@@ -132,6 +134,21 @@ public class Utils {
             waitedTime = System.currentTimeMillis()-beginTime;
         }while(lastPeekModify!=file.lastModified() || lastPeekLength!=file.length());
     }
+    
+    public static Map<String, String> styleVars(String style) {
+        String[] splits = style.split("[:;]");
+        
+        Map<String, String> vars = new HashMap<>();
+        
+        for(int i=0; i<splits.length; i++){
+            String name = splits[i++].trim();
+            if(i>=splits.length) return vars;
+            String value = splits[i].trim();
+            vars.put(name, value);
+        }
+        return vars;
+    }
+    
     
     public static class MD5 {
 

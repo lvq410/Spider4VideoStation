@@ -68,7 +68,7 @@ doubanSearchDomain: search.${doubanDomain}
 doubanSearchMovieUrl: https://${doubanSearchDomain}/movie/subject_search
 doubanMovieDomain: movie.${doubanDomain}
 doubanMovieOrigin: https://${doubanMovieDomain}
-doubanMovieItemPatterm: https://${doubanMovieDomain}/subject
+doubanMovieItemPattern: https://${doubanMovieDomain}/subject
 doubanLoginWaitTimeoutMillis: 60000
 doubanLoginCheckableDomain:
 - ${doubanSearchDomain}
@@ -77,3 +77,9 @@ doubanLoginCheckUrl: ${doubanMovieOrigin}
 doubanLoginUrl: https://accounts.${doubanDomain}/passport/login
 doubanTimeoutMillis: 30000
 doubanMaxLimit: 4
+
+baikeBaiduDomain: baike.baidu.com
+baikeBaiduOrigin: https://${baikeBaiduDomain}
+baikeBaiduSearchUrl: https://${baikeBaiduDomain}/search?pn=0&rn=0&enc=utf8
+baikeBaiduTimeoutMillis: 60000
+baikeBaiduMaxLimit: 4

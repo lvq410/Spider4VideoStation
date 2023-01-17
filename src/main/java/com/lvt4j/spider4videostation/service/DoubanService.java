@@ -99,6 +99,7 @@ public class DoubanService implements SpiderService {
         default: break;
         }
     }
+    
     @SneakyThrows
     private void movie_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
@@ -112,6 +113,7 @@ public class DoubanService implements SpiderService {
                 log.error("error load detail {}", detailUrl, e);
                 return;
             }
+            if(movie==null) return;
             
             rst.result.add(movie);
             return;
@@ -140,7 +142,7 @@ public class DoubanService implements SpiderService {
             if(detailA==null) continue;
             String detailUrl = detailA.absUrl("href");
             if(StringUtils.isBlank(detailUrl)) continue;
-            if(!detailUrl.startsWith(config.getDoubanMovieItemPatterm())) continue;
+            if(!detailUrl.startsWith(config.getDoubanMovieItemPattern())) continue;
             Element detailDiv = item.selectFirst("div.detail");
             if(detailDiv==null) continue;
             
@@ -307,6 +309,8 @@ public class DoubanService implements SpiderService {
                 log.error("error load detail {}", detailUrl, e);
                 return;
             }
+            if(tvShow==null) return;
+            
             tvShow.detailModeChange(detailUrl);
             rst.result.add(tvShow);
             return;
@@ -335,7 +339,7 @@ public class DoubanService implements SpiderService {
             if(detailA==null) continue;
             String detailUrl = detailA.absUrl("href");
             if(StringUtils.isBlank(detailUrl)) continue;
-            if(!detailUrl.startsWith(config.getDoubanMovieItemPatterm())) continue;
+            if(!detailUrl.startsWith(config.getDoubanMovieItemPattern())) continue;
             Element detailDiv = item.selectFirst("div.detail");
             if(detailDiv==null) continue;
             
@@ -506,7 +510,7 @@ public class DoubanService implements SpiderService {
             if(detailA==null) continue;
             String detailUrl = detailA.absUrl("href");
             if(StringUtils.isBlank(detailUrl)) continue;
-            if(!detailUrl.startsWith(config.getDoubanMovieItemPatterm())) continue;
+            if(!detailUrl.startsWith(config.getDoubanMovieItemPattern())) continue;
             Element detailDiv = item.selectFirst("div.detail");
             if(detailDiv==null) continue;
             
@@ -583,7 +587,6 @@ public class DoubanService implements SpiderService {
                 String posterUrl = mainpicImg.absUrl("src");
                 if(StringUtils.isNotBlank(posterUrl)){
                     posterUrl = staticController.jpgWrap(publishPrefix, posterUrl);
-                    base.extra().poster.add(posterUrl);
                     tvShow.extra().poster.add(posterUrl);
                 }
             }
@@ -592,6 +595,7 @@ public class DoubanService implements SpiderService {
                 String mainpicUrl = mainpicA.absUrl("href");
                 if(StringUtils.isNotBlank(mainpicUrl)){
                     loadBackdrops(mainpicUrl, tvShow.extra().backdrop, publishPrefix);
+                    base.extra().poster.addAll(tvShow.extra().backdrop);
                 }
             }
         }

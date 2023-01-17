@@ -17,6 +17,9 @@ public enum PluginType{
     ,AV_Normal("AV.Normal", asList("movie"), asList("movie"), asList("jpn"))
     
     ,Douban("Douban", asList("movie","tvshow", "tvshow_episode"), asList("movie","tvshow"), asList("chs"))
+    
+    ,BaikeBaidu("BaikeBaidu", asList("movie","tvshow", "tvshow_episode"), asList("movie","tvshow"), asList("chs"))
+    
     ;
     
     public final String name;

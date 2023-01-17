@@ -42,12 +42,18 @@ public class Config {
     private String doubanSearchMovieUrl;
     private String doubanMovieDomain;
     private String doubanMovieOrigin;
-    private String doubanMovieItemPatterm;
+    private String doubanMovieItemPattern;
     private long doubanLoginWaitTimeoutMillis;
     private List<String> doubanLoginCheckableDomain;
     private String doubanLoginCheckUrl;
     private String doubanLoginUrl;
 //    private long doubanTimeoutMillis;
     private int doubanMaxLimit;
+    
+    private String baikeBaiduDomain;
+    private String baikeBaiduOrigin;
+    private String baikeBaiduSearchUrl;
+//    private long baikeBaiduTimeoutMillis;
+    private int baikeBaiduMaxLimit;
     
 }
