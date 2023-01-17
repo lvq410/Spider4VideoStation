@@ -3,6 +3,7 @@ package com.lvt4j.spider4videostation;
 import java.io.File;
 import java.net.URL;
 import java.util.Base64;
+import java.util.Map;
 
 import org.apache.commons.io.FileUtils;
 import org.openqa.selenium.chrome.ChromeOptions;
@@ -15,6 +16,10 @@ import org.openqa.selenium.remote.RemoteWebDriver;
 public class DownTest {
 
     public static void main(String[] args) throws Throwable {
+        String EpisodePattern = "/subject/{subjectId}/episode/{epIdx}/";
+        Map<String, String> vars = Consts.PathMatcher.extractUriTemplateVariables(EpisodePattern, "/subject/35524406/episode/1/");
+        System.out.println(vars);
+        
 //        byte[] obs = FileUtils.readFileToByteArray(new File("C:\\Users\\chanceylee\\Desktop\\0eJb7.jpg"));
 //        System.out.println(Base64.getEncoder().encodeToString(obs));
         

@@ -3,6 +3,8 @@ package com.lvt4j.spider4videostation;
 import java.io.File;
 import java.util.concurrent.TimeUnit;
 
+import org.springframework.util.AntPathMatcher;
+
 /**
  *
  * @author LV on 2022年7月4日
@@ -15,6 +17,8 @@ public class Consts {
 
     public static final String PluginIdPrefix = "com.lvt4j.Spider4VideoStation";
 
+    public static final AntPathMatcher PathMatcher = new AntPathMatcher();
+    
     public static final File Folder_Cache = new File("cache");
     public static final File Folder_Cookies = new File("cookies");
     

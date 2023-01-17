@@ -1,10 +1,12 @@
 package com.lvt4j.spider4videostation.service;
 
+import static com.lvt4j.spider4videostation.Consts.PathMatcher;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 import java.io.File;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -56,6 +58,9 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class DoubanService implements SpiderService {
 
+    private static final String SubjectPattern = "/subject/*/";
+    private static final String EpisodePattern = "/subject/{subjectId}/episode/{epIdx}/";
+    
     @Autowired
     private Config config;
     
@@ -97,6 +102,20 @@ public class DoubanService implements SpiderService {
     @SneakyThrows
     private void movie_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
+        
+        if(isSubjectUrl(args.input.title)){
+            String detailUrl = args.input.title;
+            Movie movie = null;
+            try{
+                movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
+            }catch(Exception e){
+                log.error("error load detail {}", detailUrl, e);
+                return;
+            }
+            
+            rst.result.add(movie);
+            return;
+        }
         
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
             .queryParam("search_text", args.input.title).toUriString();
@@ -279,6 +298,20 @@ public class DoubanService implements SpiderService {
     private void tvshow_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
+        if(isSubjectUrl(args.input.title)){
+            String detailUrl = args.input.title;
+            TvShow tvShow = null;
+            try{
+                tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
+            }catch(Exception e){
+                log.error("error load detail {}", detailUrl, e);
+                return;
+            }
+            tvShow.detailModeChange(detailUrl);
+            rst.result.add(tvShow);
+            return;
+        }
+        
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
             .queryParam("search_text", args.input.title).toUriString();
         log.info("open search {}", searchUrl);
@@ -420,6 +453,36 @@ public class DoubanService implements SpiderService {
     private void tvshow_episode_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
+        if(isSubjectUrl(args.input.title)){
+            String detailUrl = args.input.title;
+            List<TvShowEpisode> episodes = null;
+            try{
+                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, null);
+                episodes.forEach(ep->ep.detailModeChange(detailUrl));
+            }catch(Exception e){
+                log.error("error load detail {}", detailUrl, e);
+                return;
+            }
+            rst.result.addAll(episodes);
+            return;
+        }
+        if(isEpisodeUrl(args.input.title)){
+            String episodeUrl = args.input.title;
+            Map<String, String> vars = PathMatcher.extractUriTemplateVariables(EpisodePattern, new URL(episodeUrl).getPath());
+            String subjectId = vars.get("subjectId");
+            String detailUrl = UriComponentsBuilder.fromHttpUrl(args.input.title).replacePath("/subject/"+subjectId+"/").toUriString();
+            List<TvShowEpisode> episodes = null;
+            try{
+                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, episodeUrl);
+            }catch(Exception e){
+                log.error("error load detail {}", detailUrl, e);
+                return;
+            }
+            rst.result.addAll(episodes);
+            return;
+        }
+        
+        
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
             .queryParam("search_text", args.input.title).toUriString();
         log.info("open search {}", searchUrl);
@@ -469,7 +532,7 @@ public class DoubanService implements SpiderService {
             
             List<TvShowEpisode> episodes = null;
             try{
-                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode);
+                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, null);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -494,7 +557,7 @@ public class DoubanService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private List<TvShowEpisode> tvshow_episode_loadItem(String pluginId, String publishPrefix, String detailUrl, Integer season, Integer epIdx) {
+    private List<TvShowEpisode> tvshow_episode_loadItem(String pluginId, String publishPrefix, String detailUrl, Integer season, Integer epIdx, String episodeUrl) {
         List<TvShowEpisode> episodes = new LinkedList<>();
         TvShowEpisode base = new TvShowEpisode(pluginId);
         if(season!=null) base.season = season;
@@ -613,21 +676,31 @@ public class DoubanService implements SpiderService {
         
         Elements epAs = contentDiv.select(".episode_list a.item");
         Map<Integer, Element> epAsMap = IntStream.range(0, epAs.size()).mapToObj(i->i).collect(Collectors.toMap(i->i+1, i->epAs.get(i)));
-        Map<Integer, Element> toLoadEpAs = new HashMap<>();
-        if(epAsMap.containsKey(epIdx)){
-            toLoadEpAs.put(epIdx, epAsMap.get(epIdx));
-        }else{
-            if(epIdx==null){
-                toLoadEpAs.putAll(epAsMap);
-            }
-        }
         
-        toLoadEpAs.forEach((idx, a)->{
-            TvShowEpisode episode = tvshow_episode_loadEpisode(a.absUrl("href"), base);
-            episode.episode = idx;
-            if(StringUtils.isBlank(episode.tagline)) episode.tagline = "第"+idx+"集";
+        if(StringUtils.isBlank(episodeUrl)){
+            Map<Integer, Element> toLoadEpAs = new HashMap<>();
+            if(epAsMap.containsKey(epIdx)){
+                toLoadEpAs.put(epIdx, epAsMap.get(epIdx));
+            }else{
+                if(epIdx==null){
+                    toLoadEpAs.putAll(epAsMap);
+                }
+            }
+            
+            toLoadEpAs.forEach((idx, a)->{
+                TvShowEpisode episode = tvshow_episode_loadEpisode(a.absUrl("href"), base);
+                episode.episode = idx;
+                if(StringUtils.isBlank(episode.tagline)) episode.tagline = "第"+idx+"集";
+                episodes.add(episode);
+            });
+        }else{
+            TvShowEpisode episode = tvshow_episode_loadEpisode(episodeUrl, base);
+            if(epIdx!=null){
+                episode.episode = epIdx;
+                if(StringUtils.isBlank(episode.tagline)) episode.tagline = "第"+epIdx+"集";
+            }
             episodes.add(episode);
-        });
+        }
         
         return episodes;
     }
@@ -769,6 +842,29 @@ public class DoubanService implements SpiderService {
         return new String(bs);
     }
     
+    private boolean isSubjectUrl(String url) {
+        URL u;
+        try{
+            u = new URL(url);
+        }catch(Exception ig){
+            return false;
+        }
+        if(!config.getDoubanMovieDomain().equals(u.getHost())) return false;
+        if(!PathMatcher.match(SubjectPattern, u.getPath())) return false;
+        return true;
+    }
+    
+    private boolean isEpisodeUrl(String url) {
+        URL u;
+        try{
+            u = new URL(url);
+        }catch(Exception ig){
+            return false;
+        }
+        if(!config.getDoubanMovieDomain().equals(u.getHost())) return false;
+        if(!PathMatcher.match(EpisodePattern, u.getPath())) return false;
+        return true;
+    }
     
     /**
      * 用 webDriver4Search 检查登录状态

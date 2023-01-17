@@ -35,6 +35,11 @@ public class TvShow implements Serializable {
         extra = ImmutableMap.of(pluginId, new Extra());
     }
     
+    public void detailModeChange(String detailUrl) {
+        summary = "分集详情下载完成后注意手动改标题为：《"+title+"》\n"+summary;
+        title = detailUrl;
+    }
+    
     public Extra extra() {
         return extra.get(pluginId);
     }
