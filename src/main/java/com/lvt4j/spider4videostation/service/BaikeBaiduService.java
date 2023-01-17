@@ -436,11 +436,12 @@ public class BaikeBaiduService implements SpiderService {
         Date beOnDate = parseDate.apply(basicInfos.get("上映时间"));
         Date releaseDate = parseDate.apply(basicInfos.get("发行日期"));
         Date releaseTime = parseDate.apply(basicInfos.get("发行时间"));
+        Date firstPlayTime = parseDate.apply(basicInfos.get("首播时间"));
         Date playBeginDate = null;
         String playDateRange = basicInfos.get("播放期间");
         if(StringUtils.isNotBlank(playDateRange)) playBeginDate = parseDate.apply(playDateRange.split("[-—]")[0]);
         
-        Date original_available = ObjectUtils.firstNonNull(beOnDate, releaseTime, releaseDate, makeDate, playBeginDate);
+        Date original_available = ObjectUtils.firstNonNull(beOnDate, releaseTime, releaseDate, makeDate, firstPlayTime, playBeginDate);
         if(original_available==null) return StringUtils.EMPTY;
         return DateFormatUtils.format(original_available, "yyyy-MM-dd");
     }
