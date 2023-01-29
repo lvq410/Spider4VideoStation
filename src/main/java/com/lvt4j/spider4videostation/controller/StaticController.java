@@ -33,7 +33,7 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("static")
 public class StaticController {
 
-    private final int MaxImgSize = 10 * 1024 * 1024;
+    private final int MaxImgSize = 4 * 1024 * 1024;
     
     @Autowired
     private FileCacher cacher;
