@@ -265,7 +265,7 @@ public class BaikeBaiduService implements SpiderService {
         
         Map<String, String> basicInfos = basicInfos(detailHtml.select("dt.basicInfo-item.name"));
         if(!basicInfos.containsKey("导 演")) return null;
-        if(!basicInfos.containsKey("集 数")) return null;
+        if(!basicInfos.containsKey("集 数") && !basicInfos.containsKey("剧集数量")) return null;
         if(detailHtml.selectFirst("#dramaSeries")==null) return null;
         
         tvShow.title = title(basicInfos);
@@ -351,7 +351,7 @@ public class BaikeBaiduService implements SpiderService {
         
         Map<String, String> basicInfos = basicInfos(detailHtml.select("dt.basicInfo-item.name"));
         if(!basicInfos.containsKey("导 演")) return episodes;
-        if(!basicInfos.containsKey("集 数")) return episodes;
+        if(!basicInfos.containsKey("集 数") && !basicInfos.containsKey("剧集数量")) return episodes;
         Element dramaSeries = detailHtml.selectFirst("div#dramaSeries");
         if(dramaSeries==null) return episodes;
         
@@ -365,7 +365,6 @@ public class BaikeBaiduService implements SpiderService {
         tvShow.summary = summary(detailHtml);
         
         loadPosterAndBackdrops(detailUrl, detailHtml, tvShow.extra().poster, tvShow.extra().backdrop, publishPrefix);
-        base.extra().poster.addAll(tvShow.extra().backdrop);
         
         base.extra().tvshow = tvShow;
         

@@ -595,7 +595,6 @@ public class DoubanService implements SpiderService {
                 String mainpicUrl = mainpicA.absUrl("href");
                 if(StringUtils.isNotBlank(mainpicUrl)){
                     loadBackdrops(mainpicUrl, tvShow.extra().backdrop, publishPrefix);
-                    base.extra().poster.addAll(tvShow.extra().backdrop);
                 }
             }
         }
