@@ -264,9 +264,7 @@ public class BaikeBaiduService implements SpiderService {
         Document detailHtml = Jsoup.parse(detailCnt);
         
         Map<String, String> basicInfos = basicInfos(detailHtml.select("dt.basicInfo-item.name"));
-        if(!basicInfos.containsKey("导 演")) return null;
-        if(!basicInfos.containsKey("集 数") && !basicInfos.containsKey("剧集数量")) return null;
-        if(detailHtml.selectFirst("#dramaSeries")==null) return null;
+        if(!isTvShow(detailHtml, basicInfos)) return null;
         
         tvShow.title = title(basicInfos);
         tvShow.original_available = original_available(basicInfos);
@@ -350,8 +348,7 @@ public class BaikeBaiduService implements SpiderService {
         Document detailHtml = Jsoup.parse(detailCnt); detailHtml.setBaseUri(detailUrl);
         
         Map<String, String> basicInfos = basicInfos(detailHtml.select("dt.basicInfo-item.name"));
-        if(!basicInfos.containsKey("导 演")) return episodes;
-        if(!basicInfos.containsKey("集 数") && !basicInfos.containsKey("剧集数量")) return episodes;
+        if(!isTvShow(detailHtml, basicInfos)) return null;
         Element dramaSeries = detailHtml.selectFirst("div#dramaSeries");
         if(dramaSeries==null) return episodes;
         
@@ -608,6 +605,12 @@ public class BaikeBaiduService implements SpiderService {
         }
         if(!config.getBaikeBaiduDomain().equals(u.getHost())) return false;
         if(!PathMatcher.match(ItemPattern, u.getPath()) && !PathMatcher.match(ItemNameOnlyPattern, u.getPath())) return false;
+        return true;
+    }
+    
+    private boolean isTvShow(Document detailHtml, Map<String, String> basicInfos) {
+        if(detailHtml.selectFirst("#dramaSeries")!=null) return true;
+        if(!basicInfos.containsKey("集 数") && !basicInfos.containsKey("剧集数量")) return false;
         return true;
     }
     
