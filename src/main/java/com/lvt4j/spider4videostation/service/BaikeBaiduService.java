@@ -36,7 +36,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.lvt4j.spider4videostation.Config;
-import com.lvt4j.spider4videostation.Consts;
 import com.lvt4j.spider4videostation.PluginType;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.controller.StaticController;
@@ -58,8 +57,11 @@ import lombok.extern.slf4j.Slf4j;
 public class BaikeBaiduService implements SpiderService {
 
     private static final String ItemPattern = "/item/{itemName}/{itemId}";
+    private static final String ItemNameOnlyPattern = "/item/{itemName}";
     private static final String PicPattern = "/pic/{picId}";
 
+    private static final String BasicInfoValuesSpilter = "[、，,]";
+    
     @Autowired
     private Config config;
     
@@ -140,9 +142,8 @@ public class BaikeBaiduService implements SpiderService {
             try{
                 detailUrl = itemA.absUrl("href");
                 if(StringUtils.isBlank(detailUrl)) continue;
+                if(!isItemUrl(detailUrl)) continue;
                 URI url = new URI(detailUrl);
-                if(!config.getBaikeBaiduDomain().equals(url.getHost())) continue;
-                if(!Consts.PathMatcher.match(ItemPattern, url.getPath())) continue;
                 detailUrl = UriComponentsBuilder.fromUri(url)
                     .scheme("https").replacePath(url.getPath()).toUriString();
             }catch(Exception ig){
@@ -175,16 +176,16 @@ public class BaikeBaiduService implements SpiderService {
         if(!basicInfos.containsKey("导 演")) return null;
         if(basicInfos.containsKey("集 数")) return null;
         
-        Optional.of("导 演").map(basicInfos::get).map(v->v.split("、")).map(Stream::of).orElse(Stream.empty()).forEach(movie.director::add);
-        Optional.of("编 剧").map(basicInfos::get).map(v->v.split("、")).map(Stream::of).orElse(Stream.empty()).forEach(movie.writer::add);
-        Optional.of("主 演").map(basicInfos::get).map(v->v.split("、")).map(Stream::of).orElse(Stream.empty()).forEach(movie.actor::add);
-        Optional.of("类 型").map(basicInfos::get).map(v->v.split("、")).map(Stream::of).orElse(Stream.empty()).forEach(movie.genre::add);
+        Optional.of("导 演").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(movie.director::add);
+        Optional.of("编 剧").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(movie.writer::add);
+        Optional.of("主 演").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(movie.actor::add);
+        Optional.of("类 型").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(movie.genre::add);
         movie.certificate = Optional.of("适合年龄").orElse(StringUtils.EMPTY);
         movie.title = title(basicInfos);
         movie.original_available = original_available(basicInfos);
         movie.summary = summary(detailHtml);
         
-        loadPosterAndBackdrops(detailUrl, movie.extra().poster, movie.extra().backdrop, publishPrefix);
+        loadPosterAndBackdrops(detailUrl, detailHtml, movie.extra().poster, movie.extra().backdrop, publishPrefix);
         
         return movie;
     }
@@ -232,9 +233,8 @@ public class BaikeBaiduService implements SpiderService {
             try{
                 detailUrl = itemA.absUrl("href");
                 if(StringUtils.isBlank(detailUrl)) continue;
+                if(!isItemUrl(detailUrl)) continue;
                 URI url = new URI(detailUrl);
-                if(!config.getBaikeBaiduDomain().equals(url.getHost())) continue;
-                if(!Consts.PathMatcher.match(ItemPattern, url.getPath())) continue;
                 detailUrl = UriComponentsBuilder.fromUri(url)
                     .scheme("https").replacePath(url.getPath()).toUriString();
             }catch(Exception ig){
@@ -272,7 +272,7 @@ public class BaikeBaiduService implements SpiderService {
         tvShow.original_available = original_available(basicInfos);
         tvShow.summary = summary(detailHtml);
         
-        loadPosterAndBackdrops(detailUrl, tvShow.extra().poster, tvShow.extra().backdrop, publishPrefix);
+        loadPosterAndBackdrops(detailUrl, detailHtml, tvShow.extra().poster, tvShow.extra().backdrop, publishPrefix);
         
         return tvShow;
     }
@@ -318,9 +318,8 @@ public class BaikeBaiduService implements SpiderService {
             try{
                 detailUrl = itemA.absUrl("href");
                 if(StringUtils.isBlank(detailUrl)) continue;
+                if(!isItemUrl(detailUrl)) continue;
                 URI url = new URI(detailUrl);
-                if(!config.getBaikeBaiduDomain().equals(url.getHost())) continue;
-                if(!Consts.PathMatcher.match(ItemPattern, url.getPath())) continue;
                 detailUrl = UriComponentsBuilder.fromUri(url)
                     .scheme("https").replacePath(url.getPath()).toUriString();
             }catch(Exception ig){
@@ -356,16 +355,16 @@ public class BaikeBaiduService implements SpiderService {
         Element dramaSeries = detailHtml.selectFirst("div#dramaSeries");
         if(dramaSeries==null) return episodes;
         
-        Optional.of("导 演").map(basicInfos::get).map(v->v.split("、")).map(Stream::of).orElse(Stream.empty()).forEach(base.director::add);
-        Optional.of("编 剧").map(basicInfos::get).map(v->v.split("、")).map(Stream::of).orElse(Stream.empty()).forEach(base.writer::add);
-        Optional.of("主 演").map(basicInfos::get).map(v->v.split("、")).map(Stream::of).orElse(Stream.empty()).forEach(base.actor::add);
-        Optional.of("类 型").map(basicInfos::get).map(v->v.split("、")).map(Stream::of).orElse(Stream.empty()).forEach(base.genre::add);
+        Optional.of("导 演").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(base.director::add);
+        Optional.of("编 剧").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(base.writer::add);
+        Optional.of("主 演").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(base.actor::add);
+        Optional.of("类 型").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(base.genre::add);
         base.certificate = Optional.of("适合年龄").map(basicInfos::get).orElse(StringUtils.EMPTY);
         tvShow.title = base.title = title(basicInfos);
         tvShow.original_available = base.original_available = original_available(basicInfos);
         tvShow.summary = summary(detailHtml);
         
-        loadPosterAndBackdrops(detailUrl, tvShow.extra().poster, tvShow.extra().backdrop, publishPrefix);
+        loadPosterAndBackdrops(detailUrl, detailHtml, tvShow.extra().poster, tvShow.extra().backdrop, publishPrefix);
         base.extra().poster.addAll(tvShow.extra().backdrop);
         
         base.extra().tvshow = tvShow;
@@ -439,7 +438,7 @@ public class BaikeBaiduService implements SpiderService {
         Date firstPlayTime = parseDate.apply(basicInfos.get("首播时间"));
         Date playBeginDate = null;
         String playDateRange = basicInfos.get("播放期间");
-        if(StringUtils.isNotBlank(playDateRange)) playBeginDate = parseDate.apply(playDateRange.split("[-—]")[0]);
+        if(StringUtils.isNotBlank(playDateRange)) playBeginDate = parseDate.apply(playDateRange.split("[-—－]")[0]);
         
         Date original_available = ObjectUtils.firstNonNull(beOnDate, releaseTime, releaseDate, makeDate, firstPlayTime, playBeginDate);
         if(original_available==null) return StringUtils.EMPTY;
@@ -473,6 +472,7 @@ public class BaikeBaiduService implements SpiderService {
                     List<String> paras = new LinkedList<>();
                     while(paraEle.is(".para")){
                         paraEle.select("div.lemma-picture").remove();
+                        paraEle.select("a.lemma-album").remove();
                         paraEle.select("sup").remove();
                         paraEle.select("a.sup-anchor").remove();
                         String para = paraEle.text().trim();
@@ -489,9 +489,21 @@ public class BaikeBaiduService implements SpiderService {
         return StringUtils.EMPTY;
     }
     @SneakyThrows
-    private void loadPosterAndBackdrops(String detailUrl, List<String> posters, List<String> backdrops, String publishPrefix) {
-        Map<String, String> itemVars = PathMatcher.extractUriTemplateVariables(ItemPattern, new URL(detailUrl).getPath());
-        String picUrl = config.getBaikeBaiduOrigin()+"/pic/"+itemVars.get("itemName")+"/"+itemVars.get("itemId")+"?fr=lemma";
+    private void loadPosterAndBackdrops(String detailUrl, Document detailHtml, List<String> posters, List<String> backdrops, String publishPrefix) {
+        String picUrl;
+        String detailPath = new URL(detailUrl).getPath();
+        if(PathMatcher.match(ItemPattern, detailPath)){
+            Map<String, String> itemVars = PathMatcher.extractUriTemplateVariables(ItemPattern, detailPath);
+            picUrl = config.getBaikeBaiduOrigin()+"/pic/"+itemVars.get("itemName")+"/"+itemVars.get("itemId")+"?fr=lemma";
+        }else if(PathMatcher.match(ItemNameOnlyPattern, detailPath)){
+            Map<String, String> itemVars = PathMatcher.extractUriTemplateVariables(ItemNameOnlyPattern, detailPath);
+            String itemId = Optional.of(detailHtml).map(d->d.select("div[data-lemmaid]")).orElse(new Elements())
+                .stream().map(d->d.attr("data-lemmaid")).filter(StringUtils::isNotBlank).findFirst().orElse(null);
+            if(StringUtils.isBlank(itemId)) return;
+            picUrl = config.getBaikeBaiduOrigin()+"/pic/"+itemVars.get("itemName")+"/"+itemId+"?fr=lemma";
+        }else{
+            return;
+        }
         
         log.info("load picUrl {}", picUrl);
         String picCnt = loadPage(picUrl);
@@ -596,7 +608,7 @@ public class BaikeBaiduService implements SpiderService {
             return false;
         }
         if(!config.getBaikeBaiduDomain().equals(u.getHost())) return false;
-        if(!PathMatcher.match(ItemPattern, u.getPath())) return false;
+        if(!PathMatcher.match(ItemPattern, u.getPath()) && !PathMatcher.match(ItemNameOnlyPattern, u.getPath())) return false;
         return true;
     }
     
