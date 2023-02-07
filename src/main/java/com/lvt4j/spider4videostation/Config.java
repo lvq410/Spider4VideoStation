@@ -31,6 +31,9 @@ public class Config {
     private long cacheMaxSize;
     private long cacheExpireDuration;
     
+    private int fileEpOffset;
+    private int siteEpOffset;
+    
     private String javdbOrigin;
     private String javdbTouchUrl;
 //    private int javdbTimeoutMillis;
@@ -55,5 +58,19 @@ public class Config {
     private String baikeBaiduSearchUrl;
 //    private long baikeBaiduTimeoutMillis;
     private int baikeBaiduMaxLimit;
+    
+    public Integer fileEpIdx2SiteEpIdx(Integer fileEpIdx) {
+        if(fileEpIdx==null) return null;
+        int standardEpIdx = fileEpIdx + fileEpOffset;
+        int siteEpIdx = standardEpIdx - siteEpOffset;
+        return siteEpIdx;
+    }
+    
+    public Integer siteEpIdx2FileEpIdx(Integer siteEpIdx) {
+        if(siteEpIdx==null) return null;
+        int standardEpIdx = siteEpIdx + siteEpOffset;
+        int fileEpIdx = standardEpIdx - fileEpOffset;
+        return fileEpIdx;
+    }
     
 }

@@ -3,6 +3,7 @@ package com.lvt4j.spider4videostation;
 import static com.lvt4j.spider4videostation.Consts.AvIdPattern;
 
 import java.io.File;
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.security.MessageDigest;
 import java.util.HashMap;
@@ -149,6 +150,14 @@ public class Utils {
         return vars;
     }
     
+    public static boolean isUrl(String url) {
+        try{
+            new URL(url);
+            return true;
+        }catch(Exception e){
+            return false;
+        }
+    }
     
     public static class MD5 {
 

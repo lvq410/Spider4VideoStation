@@ -7,15 +7,11 @@
         <meta http-equiv="Pragma" content="no-cache"> 
     </head>
     <body>
-        <p>
-            <a href="javascript:;" onclick="redirect('plugin')" style="font-size:x-large;">下载插件</a>
-        </p>
-        <p>
-            <a href="javascript:;" onclick="cleanCache()" style="font-size:x-large;">清空缓存</a>
-        </p>
-        <p>
-            <a href="javascript:;" onclick="doubanLogin()" style="font-size:x-large;">豆瓣登录</a>
-        </p>
+<div style="display: -webkit-flex;display: flex;">
+    <div style="-webkit-flex: 1;flex: 1;">
+        <p><a href="javascript:;" onclick="redirect('plugin')" style="font-size:x-large;">下载插件</a></p>
+        <p><a href="javascript:;" onclick="cleanCache()" style="font-size:x-large;">清空缓存</a></p>
+        <p><a href="javascript:;" onclick="doubanLogin()" style="font-size:x-large;">豆瓣登录</a></p>
         <p>
             插件测试：
             <select id="pluginType" onchange="onPluginSelect()"></select>
@@ -35,6 +31,35 @@
             <button id="btn" onclick="search()">搜索</button>
         </p>
         <textarea id="searchRst" placeholder="搜索结果" style="width:1000px;height:500px;"></textarea>
+    </div>
+    <div style="-webkit-flex: none;flex: none;width: 700px;">
+        <table style="border: 1px solid #000;">
+            <thead>
+                <tr><td colspan="4">系统设置</td></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>Javdb地址</td>
+                    <td><input id="prop-javdbOrigin"/></td>
+                    <td><button id="prop-btn-javdbOrigin" onclick="propChagne('javdbOrigin')">设置</button></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>视频集号偏移量</td>
+                    <td><input id="prop-fileEpOffset" type="number"/></td>
+                    <td><button id="prop-btn-fileEpOffset" onclick="propChagne('fileEpOffset')">设置</button></td>
+                    <td>视频文件名标注的集号+偏移量=标准集号</td>
+                </tr>
+                <tr>
+                    <td>源站集号偏移量</td>
+                    <td><input id="prop-siteEpOffset" type="number"/></td>
+                    <td><button id="prop-btn-siteEpOffset" onclick="propChagne('siteEpOffset')">设置</button></td>
+                    <td>源站集号+偏移量=标准集号</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
     </body>
     <script>
 var Plugins = @@Plugins@@;
@@ -44,6 +69,28 @@ for(var id in Plugins){
 }
 document.getElementById('pluginType').innerHTML = pluginTypeOptionHtml;
 onPluginSelect();
+
+var propKeys = ['javdbOrigin','fileEpOffset','siteEpOffset'];
+post('prop/gets', propKeys, function(props){
+    propKeys.forEach(function(key){
+        document.getElementById('prop-'+key).value = props[key];
+    })
+}, function(){
+    propKeys.forEach(function(key){
+        document.getElementById('prop-btn-'+key).disabled=true;
+    })
+})
+function propChagne(key){
+    var val = document.getElementById('prop-'+key).value;
+    document.getElementById('prop-btn-'+key).disabled=true;
+    post('prop/set?key='+key+'&val='+val, null, function(){
+        document.getElementById('prop-btn-'+key).disabled=false;
+        alert('设置成功');
+    }, function(){
+        document.getElementById('prop-btn-'+key).disabled=false;
+        alert('设置失败');
+    })
+}
 function publishPrefix(){
     return location.href;
 }
@@ -168,6 +215,15 @@ function post(uri, body, callback, failCallback){
         if(failCallback) failCallback();
     };
     xhr.open('POST', uri);
+    switch(typeof body){
+    case 'object':
+        if(body!=null) body = JSON.stringify(body);
+        xhr.setRequestHeader('content-type', 'application/json;charset=UTF-8');
+        break;
+    case 'string':
+        xhr.setRequestHeader('content-type', 'text/plain;charset=UTF-8');
+        break;
+    }
     xhr.send(body);
 }
     </script>

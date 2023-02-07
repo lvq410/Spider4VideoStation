@@ -1,6 +1,7 @@
 package com.lvt4j.spider4videostation.service;
 
 import static com.lvt4j.spider4videostation.Consts.PathMatcher;
+import static com.lvt4j.spider4videostation.Utils.isUrl;
 
 import java.net.URI;
 import java.net.URL;
@@ -103,19 +104,22 @@ public class BaikeBaiduService implements SpiderService {
     private void movie_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getBaikeBaiduMaxLimit());
         
-        if(isItemUrl(args.input.title)){
-            String detailUrl = args.input.title;
-            
-            Movie movie = null;
-            try{
-                movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
-            }catch(Exception e){
-                log.error("error load detail {}", detailUrl, e);
+        if(isUrl(args.input.title)){
+            if(isItemUrl(args.input.title)){
+                String detailUrl = args.input.title;
+                
+                Movie movie = null;
+                try{
+                    movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
+                }catch(Exception e){
+                    log.error("error load detail {}", detailUrl, e);
+                    return;
+                }
+                if(movie==null) return;
+                
+                rst.result.add(movie);
                 return;
             }
-            if(movie==null) return;
-            
-            rst.result.add(movie);
             return;
         }
         
@@ -194,19 +198,22 @@ public class BaikeBaiduService implements SpiderService {
     private void tvshow_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getBaikeBaiduMaxLimit());
         
-        if(isItemUrl(args.input.title)){
-            String detailUrl = args.input.title;
-            TvShow tvShow = null;
-            try{
-                tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
-            }catch(Exception e){
-                log.error("error load detail {}", detailUrl, e);
+        if(isUrl(args.input.title)){
+            if(isItemUrl(args.input.title)){
+                String detailUrl = args.input.title;
+                TvShow tvShow = null;
+                try{
+                    tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
+                }catch(Exception e){
+                    log.error("error load detail {}", detailUrl, e);
+                    return;
+                }
+                if(tvShow==null) return;
+                
+                tvShow.detailModeChange(detailUrl);
+                rst.result.add(tvShow);
                 return;
             }
-            if(tvShow==null) return;
-            
-            tvShow.detailModeChange(detailUrl);
-            rst.result.add(tvShow);
             return;
         }
         
@@ -279,17 +286,20 @@ public class BaikeBaiduService implements SpiderService {
     private void tvshow_episode_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getBaikeBaiduMaxLimit());
         
-        if(isItemUrl(args.input.title)){
-            String detailUrl = args.input.title;
-            List<TvShowEpisode> episodes = null;
-            try{
-                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode);
-                episodes.forEach(ep->ep.detailModeChange(detailUrl));
-            }catch(Exception e){
-                log.error("error load detail {}", detailUrl, e);
+        if(isUrl(args.input.title)){
+            if(isItemUrl(args.input.title)){
+                String detailUrl = args.input.title;
+                List<TvShowEpisode> episodes = null;
+                try{
+                    episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode);
+                    episodes.forEach(ep->ep.detailModeChange(detailUrl));
+                }catch(Exception e){
+                    log.error("error load detail {}", detailUrl, e);
+                    return;
+                }
+                rst.result.addAll(episodes);
                 return;
             }
-            rst.result.addAll(episodes);
             return;
         }
         
@@ -387,12 +397,16 @@ public class BaikeBaiduService implements SpiderService {
             episode.summary = dd.text().trim();
             episodeMap.put(episode.episode, episode);
         }
-        
-        if(epIdx==null){
+        Integer siteEpIdx = config.fileEpIdx2SiteEpIdx(epIdx);
+        if(siteEpIdx==null){
             episodes.addAll(episodeMap.values());
         }else{
-            TvShowEpisode episode = episodeMap.get(epIdx);
+            TvShowEpisode episode = episodeMap.get(siteEpIdx);
             if(episode!=null) episodes.add(episode);
+        }
+        
+        for(TvShowEpisode ep : episodes){
+            ep.episode = config.siteEpIdx2FileEpIdx(ep.episode);
         }
         
         return episodes;
@@ -417,6 +431,7 @@ public class BaikeBaiduService implements SpiderService {
             @Override
             public Date apply(String str) {
                 if(StringUtils.isBlank(str)) return null;
+                str = str.replaceAll(" ", "").split("[-—－]")[0];
                 try{
                     return DateUtils.parseDateStrictly(str
                         ,"yyyy年M月d日"
@@ -432,9 +447,7 @@ public class BaikeBaiduService implements SpiderService {
         Date releaseDate = parseDate.apply(basicInfos.get("发行日期"));
         Date releaseTime = parseDate.apply(basicInfos.get("发行时间"));
         Date firstPlayTime = parseDate.apply(basicInfos.get("首播时间"));
-        Date playBeginDate = null;
-        String playDateRange = basicInfos.get("播放期间");
-        if(StringUtils.isNotBlank(playDateRange)) playBeginDate = parseDate.apply(playDateRange.split("[-—－]")[0]);
+        Date playBeginDate = parseDate.apply(basicInfos.get("播放期间"));
         
         Date original_available = ObjectUtils.firstNonNull(beOnDate, releaseTime, releaseDate, makeDate, firstPlayTime, playBeginDate);
         if(original_available==null) return StringUtils.EMPTY;

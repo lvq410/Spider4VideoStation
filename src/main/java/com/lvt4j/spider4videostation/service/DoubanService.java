@@ -1,6 +1,7 @@
 package com.lvt4j.spider4videostation.service;
 
 import static com.lvt4j.spider4videostation.Consts.PathMatcher;
+import static com.lvt4j.spider4videostation.Utils.isUrl;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 import java.io.File;
@@ -104,18 +105,21 @@ public class DoubanService implements SpiderService {
     private void movie_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
-        if(isSubjectUrl(args.input.title)){
-            String detailUrl = args.input.title;
-            Movie movie = null;
-            try{
-                movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
-            }catch(Exception e){
-                log.error("error load detail {}", detailUrl, e);
+        if(isUrl(args.input.title)){
+            if(isSubjectUrl(args.input.title)){
+                String detailUrl = args.input.title;
+                Movie movie = null;
+                try{
+                    movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
+                }catch(Exception e){
+                    log.error("error load detail {}", detailUrl, e);
+                    return;
+                }
+                if(movie==null) return;
+                
+                rst.result.add(movie);
                 return;
             }
-            if(movie==null) return;
-            
-            rst.result.add(movie);
             return;
         }
         
@@ -300,19 +304,22 @@ public class DoubanService implements SpiderService {
     private void tvshow_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
-        if(isSubjectUrl(args.input.title)){
-            String detailUrl = args.input.title;
-            TvShow tvShow = null;
-            try{
-                tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
-            }catch(Exception e){
-                log.error("error load detail {}", detailUrl, e);
+        if(isUrl(args.input.title)){
+            if(isSubjectUrl(args.input.title)){
+                String detailUrl = args.input.title;
+                TvShow tvShow = null;
+                try{
+                    tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
+                }catch(Exception e){
+                    log.error("error load detail {}", detailUrl, e);
+                    return;
+                }
+                if(tvShow==null) return;
+                
+                tvShow.detailModeChange(detailUrl);
+                rst.result.add(tvShow);
                 return;
             }
-            if(tvShow==null) return;
-            
-            tvShow.detailModeChange(detailUrl);
-            rst.result.add(tvShow);
             return;
         }
         
@@ -457,35 +464,37 @@ public class DoubanService implements SpiderService {
     private void tvshow_episode_search(String pluginId, String publishPrefix, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
-        if(isSubjectUrl(args.input.title)){
-            String detailUrl = args.input.title;
-            List<TvShowEpisode> episodes = null;
-            try{
-                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, null);
-                episodes.forEach(ep->ep.detailModeChange(detailUrl));
-            }catch(Exception e){
-                log.error("error load detail {}", detailUrl, e);
+        if(isUrl(args.input.title)){
+            if(isSubjectUrl(args.input.title)){
+                String detailUrl = args.input.title;
+                List<TvShowEpisode> episodes = null;
+                try{
+                    episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, null);
+                    episodes.forEach(ep->ep.detailModeChange(detailUrl));
+                }catch(Exception e){
+                    log.error("error load detail {}", detailUrl, e);
+                    return;
+                }
+                rst.result.addAll(episodes);
                 return;
             }
-            rst.result.addAll(episodes);
-            return;
-        }
-        if(isEpisodeUrl(args.input.title)){
-            String episodeUrl = args.input.title;
-            Map<String, String> vars = PathMatcher.extractUriTemplateVariables(EpisodePattern, new URL(episodeUrl).getPath());
-            String subjectId = vars.get("subjectId");
-            String detailUrl = UriComponentsBuilder.fromHttpUrl(args.input.title).replacePath("/subject/"+subjectId+"/").toUriString();
-            List<TvShowEpisode> episodes = null;
-            try{
-                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, episodeUrl);
-            }catch(Exception e){
-                log.error("error load detail {}", detailUrl, e);
+            if(isEpisodeUrl(args.input.title)){
+                String episodeUrl = args.input.title;
+                Map<String, String> vars = PathMatcher.extractUriTemplateVariables(EpisodePattern, new URL(episodeUrl).getPath());
+                String subjectId = vars.get("subjectId");
+                String detailUrl = UriComponentsBuilder.fromHttpUrl(args.input.title).replacePath("/subject/"+subjectId+"/").toUriString();
+                List<TvShowEpisode> episodes = null;
+                try{
+                    episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, episodeUrl);
+                }catch(Exception e){
+                    log.error("error load detail {}", detailUrl, e);
+                    return;
+                }
+                rst.result.addAll(episodes);
                 return;
             }
-            rst.result.addAll(episodes);
             return;
         }
-        
         
         String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
             .queryParam("search_text", args.input.title).toUriString();
@@ -541,21 +550,6 @@ public class DoubanService implements SpiderService {
                 log.error("error load detail {}", detailUrl, e);
                 continue;
             }
-            
-//            if(episodes==null){ //未从详情页提取出信息
-//                if(StringUtils.isNotBlank(title) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
-//                    //用列表上的数据
-//                    TvShowEpisode episode = new TvShowEpisode(plugin.id);
-//                    if(StringUtils.isNotBlank(title)) episode.title = title;
-//                    if(StringUtils.isNotBlank(coverUrl)) {
-//                        episode.extra().poster.add(0, coverUrl);
-//                        episode.extra().backdrop.add(0, coverUrl);
-//                    }
-//                    episodes = Arrays.asList(episode);
-//                }else{
-//                    continue;
-//                }
-//            }
             
             rst.result.addAll(episodes);
             if(args.reachLimit(++rstNum)) break;
@@ -680,12 +674,14 @@ public class DoubanService implements SpiderService {
         Elements epAs = contentDiv.select(".episode_list a.item");
         Map<Integer, Element> epAsMap = IntStream.range(0, epAs.size()).mapToObj(i->i).collect(Collectors.toMap(i->i+1, i->epAs.get(i)));
         
+        Integer siteEpIdx = config.fileEpIdx2SiteEpIdx(epIdx);
+        
         if(StringUtils.isBlank(episodeUrl)){
             Map<Integer, Element> toLoadEpAs = new HashMap<>();
-            if(epAsMap.containsKey(epIdx)){
-                toLoadEpAs.put(epIdx, epAsMap.get(epIdx));
+            if(epAsMap.containsKey(siteEpIdx)){
+                toLoadEpAs.put(siteEpIdx, epAsMap.get(siteEpIdx));
             }else{
-                if(epIdx==null){
+                if(siteEpIdx==null){
                     toLoadEpAs.putAll(epAsMap);
                 }
             }
@@ -693,17 +689,21 @@ public class DoubanService implements SpiderService {
             toLoadEpAs.forEach((idx, a)->{
                 TvShowEpisode episode = tvshow_episode_loadEpisode(a.absUrl("href"), base);
                 episode.episode = idx;
-                if(StringUtils.isBlank(episode.tagline)) episode.tagline = "第"+idx+"集";
                 episodes.add(episode);
             });
         }else{
             TvShowEpisode episode = tvshow_episode_loadEpisode(episodeUrl, base);
-            if(epIdx!=null){
-                episode.episode = epIdx;
-                if(StringUtils.isBlank(episode.tagline)) episode.tagline = "第"+epIdx+"集";
+            if(siteEpIdx!=null){
+                episode.episode = siteEpIdx;
             }
             episodes.add(episode);
         }
+        
+        for(TvShowEpisode ep : episodes){
+            ep.episode = config.siteEpIdx2FileEpIdx(ep.episode);
+            if(StringUtils.isBlank(ep.tagline)) ep.tagline = "第"+ep.episode+"集";
+        }
+        
         
         return episodes;
     }

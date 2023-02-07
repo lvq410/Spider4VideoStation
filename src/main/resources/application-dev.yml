@@ -10,7 +10,7 @@ spring:
 
 logging:
   level:
-    com.lvt4j.spider4videostation: trace
+    com.lvt4j.spider4videostation: info
 
 webDriverAddr: http://127.0.0.1:24444
 webDriverArgs:
@@ -27,4 +27,4 @@ webDriverArgs:
 #staticMode: chromeDown
 staticChromeDownloadFolder: E:\Download\Spider4VideoStationStatic
 
-javdbOrigin: https://javdb006.com
+javdbOrigin: https://javdb007.com

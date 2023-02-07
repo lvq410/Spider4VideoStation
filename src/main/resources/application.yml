@@ -57,7 +57,10 @@ staticChromeDownloadFolder: /home/seluser/Downloads
 cacheMaxSize: 1073741824
 cacheExpireDuration: 2592000000  
 
-javdbOrigin: https://javdb.com
+fileEpOffset: 0
+siteEpOffset: 0
+
+javdbOrigin: https://javdb007.com
 javdbTouchUrl: ${javdbOrigin}/manifest.json
 javdbTimeoutMillis: 30000
 
