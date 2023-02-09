@@ -472,7 +472,9 @@ public class BaikeBaiduService implements SpiderService {
     }
     
     private String summary(Document doc) {
-        Element summaryAnchor = doc.selectFirst("div.anchor-list a[name=剧情简介].lemma-anchor");
+        Element plotAnchor = doc.selectFirst("div.anchor-list a[name=剧情简介].lemma-anchor");
+        Element storyAnchor = doc.selectFirst("div.anchor-list a[name=故事简介].lemma-anchor");
+        Element summaryAnchor = ObjectUtils.defaultIfNull(plotAnchor, storyAnchor);
         if(summaryAnchor!=null){
             Element paraEle = summaryAnchor.parent().nextElementSibling();
             if(paraEle!=null) {
