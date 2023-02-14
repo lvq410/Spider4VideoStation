@@ -291,7 +291,7 @@ public class BaikeBaiduService implements SpiderService {
                 String detailUrl = args.input.title;
                 List<TvShowEpisode> episodes = null;
                 try{
-                    episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode);
+                    episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, false, args.input.season, args.input.episode);
                     episodes.forEach(ep->ep.detailModeChange(detailUrl));
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
@@ -336,7 +336,7 @@ public class BaikeBaiduService implements SpiderService {
             
             List<TvShowEpisode> episodes = null;
             try{
-                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode);
+                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, true, args.input.season, args.input.episode);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -346,7 +346,7 @@ public class BaikeBaiduService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private List<TvShowEpisode> tvshow_episode_loadItem(String pluginId, String publishPrefix, String detailUrl, Integer season, Integer epIdx) {
+    private List<TvShowEpisode> tvshow_episode_loadItem(String pluginId, String publishPrefix, String detailUrl, boolean strictMode, Integer season, Integer epIdx) {
         List<TvShowEpisode> episodes = new LinkedList<>();
         TvShowEpisode base = new TvShowEpisode(pluginId);
         if(season!=null) base.season = season;
@@ -358,9 +358,7 @@ public class BaikeBaiduService implements SpiderService {
         Document detailHtml = Jsoup.parse(detailCnt); detailHtml.setBaseUri(detailUrl);
         
         Map<String, String> basicInfos = basicInfos(detailHtml.select("dt.basicInfo-item.name"));
-        if(!isTvShow(detailHtml, basicInfos)) return null;
-        Element dramaSeries = detailHtml.selectFirst("div#dramaSeries");
-        if(dramaSeries==null) return episodes;
+        if(strictMode && !isTvShow(detailHtml, basicInfos)) return null;
         
         Optional.of("导 演").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(base.director::add);
         Optional.of("编 剧").map(basicInfos::get).map(v->v.split(BasicInfoValuesSpilter)).map(Stream::of).orElse(Stream.empty()).forEach(base.writer::add);
@@ -376,7 +374,7 @@ public class BaikeBaiduService implements SpiderService {
         base.extra().tvshow = tvShow;
         
         Map<Integer, TvShowEpisode> episodeMap = new TreeMap<>();
-        Elements dts = dramaSeries.select("ul#dramaSerialList dt");
+        Elements dts = detailHtml.select("div#dramaSeriesul#dramaSerialList dt");
         for(int i=0; i<dts.size(); i++){
             Element dt = dts.get(i);
             Element dd = dt.nextElementSibling();
@@ -401,8 +399,15 @@ public class BaikeBaiduService implements SpiderService {
         if(siteEpIdx==null){
             episodes.addAll(episodeMap.values());
         }else{
-            TvShowEpisode episode = episodeMap.get(siteEpIdx);
-            if(episode!=null) episodes.add(episode);
+            if(episodeMap.isEmpty()){
+                TvShowEpisode episode = SerializationUtils.clone(base);
+                episode.episode = epIdx;
+                episode.tagline = "第"+siteEpIdx+"集";
+                episodes.add(episode);
+            }else{
+                TvShowEpisode episode = episodeMap.get(siteEpIdx);
+                if(episode!=null) episodes.add(episode);
+            }
         }
         
         for(TvShowEpisode ep : episodes){

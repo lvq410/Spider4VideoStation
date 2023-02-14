@@ -671,26 +671,35 @@ public class DoubanService implements SpiderService {
         
         base.extra().tvshow = tvShow;
         
-        Elements epAs = contentDiv.select(".episode_list a.item");
-        Map<Integer, Element> epAsMap = IntStream.range(0, epAs.size()).mapToObj(i->i).collect(Collectors.toMap(i->i+1, i->epAs.get(i)));
         
         Integer siteEpIdx = config.fileEpIdx2SiteEpIdx(epIdx);
         
         if(StringUtils.isBlank(episodeUrl)){
-            Map<Integer, Element> toLoadEpAs = new HashMap<>();
-            if(epAsMap.containsKey(siteEpIdx)){
-                toLoadEpAs.put(siteEpIdx, epAsMap.get(siteEpIdx));
-            }else{
-                if(siteEpIdx==null){
-                    toLoadEpAs.putAll(epAsMap);
-                }
-            }
+            Elements epAs = contentDiv.select(".episode_list a.item");
             
-            toLoadEpAs.forEach((idx, a)->{
-                TvShowEpisode episode = tvshow_episode_loadEpisode(a.absUrl("href"), base);
-                episode.episode = idx;
-                episodes.add(episode);
-            });
+            if(epAs.isEmpty()){
+                if(siteEpIdx!=null){
+                    TvShowEpisode episode = SerializationUtils.clone(base);
+                    episode.episode = siteEpIdx;
+                    episodes.add(episode);
+                }
+            }else{
+                Map<Integer, Element> epAsMap = IntStream.range(0, epAs.size()).mapToObj(i->i).collect(Collectors.toMap(i->i+1, i->epAs.get(i)));
+                Map<Integer, Element> toLoadEpAs = new HashMap<>();
+                if(epAsMap.containsKey(siteEpIdx)){
+                    toLoadEpAs.put(siteEpIdx, epAsMap.get(siteEpIdx));
+                }else{
+                    if(siteEpIdx==null){
+                        toLoadEpAs.putAll(epAsMap);
+                    }
+                }
+                
+                toLoadEpAs.forEach((idx, a)->{
+                    TvShowEpisode episode = tvshow_episode_loadEpisode(a.absUrl("href"), base);
+                    episode.episode = idx;
+                    episodes.add(episode);
+                });
+            }
         }else{
             TvShowEpisode episode = tvshow_episode_loadEpisode(episodeUrl, base);
             if(siteEpIdx!=null){
@@ -703,7 +712,6 @@ public class DoubanService implements SpiderService {
             ep.episode = config.siteEpIdx2FileEpIdx(ep.episode);
             if(StringUtils.isBlank(ep.tagline)) ep.tagline = "第"+ep.episode+"集";
         }
-        
         
         return episodes;
     }
