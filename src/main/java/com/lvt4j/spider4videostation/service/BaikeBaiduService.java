@@ -374,7 +374,7 @@ public class BaikeBaiduService implements SpiderService {
         base.extra().tvshow = tvShow;
         
         Map<Integer, TvShowEpisode> episodeMap = new TreeMap<>();
-        Elements dts = detailHtml.select("div#dramaSeriesul#dramaSerialList dt");
+        Elements dts = detailHtml.select("div#dramaSeries ul#dramaSerialList dt");
         for(int i=0; i<dts.size(); i++){
             Element dt = dts.get(i);
             Element dd = dt.nextElementSibling();
