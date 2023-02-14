@@ -681,6 +681,7 @@ public class DoubanService implements SpiderService {
                 if(siteEpIdx!=null){
                     TvShowEpisode episode = SerializationUtils.clone(base);
                     episode.episode = siteEpIdx;
+                    episode.summary = tvShow.summary;
                     episodes.add(episode);
                 }
             }else{

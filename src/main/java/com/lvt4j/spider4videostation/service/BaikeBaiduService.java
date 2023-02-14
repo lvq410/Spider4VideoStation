@@ -403,6 +403,7 @@ public class BaikeBaiduService implements SpiderService {
                 TvShowEpisode episode = SerializationUtils.clone(base);
                 episode.episode = epIdx;
                 episode.tagline = "第"+siteEpIdx+"集";
+                episode.summary = tvShow.summary;
                 episodes.add(episode);
             }else{
                 TvShowEpisode episode = episodeMap.get(siteEpIdx);
