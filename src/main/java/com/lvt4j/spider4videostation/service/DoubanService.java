@@ -451,6 +451,7 @@ public class DoubanService implements SpiderService {
             default: break;
             }
         }
+        if(StringUtils.isNotBlank(config.getOriginalAvailable())) tvShow.original_available = config.getOriginalAvailable();
         
         Element summarySpan = contentDiv.selectFirst("span[property='v:summary']");
         if(summarySpan!=null){
@@ -654,6 +655,8 @@ public class DoubanService implements SpiderService {
             default: break;
             }
         }
+        if(StringUtils.isNotBlank(config.getOriginalAvailable())) tvShow.original_available = config.getOriginalAvailable();
+        
         Element ratingStrong = contentDiv.selectFirst("strong[property='v:average']");
         if(ratingStrong!=null){
             String rating = ratingStrong.text().trim();

@@ -16,6 +16,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -36,6 +38,7 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import com.google.common.collect.ImmutableMap;
 import com.lvt4j.spider4videostation.Config;
 import com.lvt4j.spider4videostation.PluginType;
 import com.lvt4j.spider4videostation.Utils;
@@ -61,7 +64,7 @@ public class BaikeBaiduService implements SpiderService {
     private static final String ItemNameOnlyPattern = "/item/{itemName}";
     private static final String PicPattern = "/pic/{picId}";
 
-    private static final String BasicInfoValuesSpilter = "[、，,]";
+    private static final String BasicInfoValuesSpilter = "[、，,～]";
     
     @Autowired
     private Config config;
@@ -433,17 +436,28 @@ public class BaikeBaiduService implements SpiderService {
         return title;
     }
     private String original_available(Map<String, String> basicInfos) {
+        if(StringUtils.isNotBlank(config.getOriginalAvailable())) return config.getOriginalAvailable();
+        
         Function<String, Date> parseDate = new Function<String, Date>() {
+            Map<String, String> patterns = ImmutableMap.of(
+                "\\d{4}年\\d{1,2}月\\d{1,2}日", "yyyy年M月d日"
+                ,"\\d{4}年\\d{1,2}月", "yyyy年M月"
+                ,"\\d{4}年", "yyyy年"
+                ,"\\d{4}", "yyyy"
+            );
+            
             @Override
             public Date apply(String str) {
                 if(StringUtils.isBlank(str)) return null;
-                str = str.replaceAll(" ", "").split("[-—－]")[0];
-                try{
-                    return DateUtils.parseDateStrictly(str
-                        ,"yyyy年M月d日"
-                        ,"yyyy年"
-                    );
-                }catch(Exception ig){}
+                str = str.replaceAll(" ", "");
+                for(String regex : patterns.keySet()){
+                    Matcher m = Pattern.compile(regex).matcher(str);
+                    if(!m.find()) continue;
+                    String date = m.group(0);
+                    try{
+                        return DateUtils.parseDateStrictly(date, patterns.get(regex));
+                    }catch(Exception ig){}
+                }
                 return null;
             }
         };
@@ -454,8 +468,9 @@ public class BaikeBaiduService implements SpiderService {
         Date releaseTime = parseDate.apply(basicInfos.get("发行时间"));
         Date firstPlayTime = parseDate.apply(basicInfos.get("首播时间"));
         Date playBeginDate = parseDate.apply(basicInfos.get("播放期间"));
+        Date hkPlayDate = parseDate.apply(basicInfos.get("香港首播"));
         
-        Date original_available = ObjectUtils.firstNonNull(beOnDate, releaseTime, releaseDate, makeDate, firstPlayTime, playBeginDate);
+        Date original_available = ObjectUtils.firstNonNull(beOnDate, releaseTime, releaseDate, makeDate, firstPlayTime, playBeginDate, hkPlayDate);
         if(original_available==null) return StringUtils.EMPTY;
         return DateFormatUtils.format(original_available, "yyyy-MM-dd");
     }
@@ -478,31 +493,38 @@ public class BaikeBaiduService implements SpiderService {
     }
     
     private String summary(Document doc) {
+        Function<Element, String> paraEleExtract = new Function<Element, String>() {
+            @Override
+            public String apply(Element paraEle) {
+                if(paraEle==null) return null;
+                List<String> paras = new LinkedList<>();
+                while(paraEle!=null && paraEle.is(".para")){
+                    paraEle.select("div.lemma-picture").remove();
+                    paraEle.select("a.lemma-album").remove();
+                    paraEle.select("sup").remove();
+                    paraEle.select("a.sup-anchor").remove();
+                    String para = paraEle.text().trim();
+                    if(StringUtils.isNotBlank(para)){
+                        para = "　　"+para;
+                        paras.add(para);
+                    }
+                    paraEle = paraEle.nextElementSibling();
+                }
+                return StringUtils.join(paras, "\n");
+            }
+        };
+        
         Element plotAnchor = doc.selectFirst("div.anchor-list a[name=剧情简介].lemma-anchor");
         Element storyAnchor = doc.selectFirst("div.anchor-list a[name=故事简介].lemma-anchor");
-        Element summaryAnchor = ObjectUtils.defaultIfNull(plotAnchor, storyAnchor);
+        Element storySummaryAnchor = doc.selectFirst("div.anchor-list a[name=故事概要].lemma-anchor");
+        Element summaryAnchor = ObjectUtils.firstNonNull(plotAnchor, storyAnchor, storySummaryAnchor);
         if(summaryAnchor!=null){
-            Element paraEle = summaryAnchor.parent().nextElementSibling();
-            if(paraEle!=null) {
-                paraEle = paraEle.nextElementSibling();
-                if(paraEle!=null){
-                    List<String> paras = new LinkedList<>();
-                    while(paraEle.is(".para")){
-                        paraEle.select("div.lemma-picture").remove();
-                        paraEle.select("a.lemma-album").remove();
-                        paraEle.select("sup").remove();
-                        paraEle.select("a.sup-anchor").remove();
-                        String para = paraEle.text().trim();
-                        if(StringUtils.isNotBlank(para)){
-                            para = "　　"+para;
-                            paras.add(para);
-                        }
-                        paraEle = paraEle.nextElementSibling();
-                    }
-                    return StringUtils.join(paras, "\n");
-                }
-            }
+            Element paraEle = Optional.ofNullable(summaryAnchor.parent()).map(e->e.nextElementSibling()).map(e->e.nextElementSibling()).orElse(null);
+            if(paraEle!=null) return paraEleExtract.apply(paraEle);
         }
+        Element lemmaSummaryParaEle = doc.selectFirst("div.lemma-summary div.para");
+        if(lemmaSummaryParaEle!=null) return paraEleExtract.apply(lemmaSummaryParaEle);
+        
         return StringUtils.EMPTY;
     }
     @SneakyThrows

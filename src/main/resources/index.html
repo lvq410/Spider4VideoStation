@@ -56,6 +56,12 @@
                     <td><button id="prop-btn-siteEpOffset" onclick="propChagne('siteEpOffset')">设置</button></td>
                     <td>源站集号+偏移量=标准集号</td>
                 </tr>
+                <tr>
+                    <td>强制发布日期</td>
+                    <td><input id="prop-originalAvailable"/></td>
+                    <td><button id="prop-btn-originalAvailable" onclick="propChagne('originalAvailable')">设置</button></td>
+                    <td>无视从源站解析出的发布日期，强制用该值</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -70,7 +76,7 @@ for(var id in Plugins){
 document.getElementById('pluginType').innerHTML = pluginTypeOptionHtml;
 onPluginSelect();
 
-var propKeys = ['javdbOrigin','fileEpOffset','siteEpOffset'];
+var propKeys = ['javdbOrigin','fileEpOffset','siteEpOffset','originalAvailable'];
 post('prop/gets', propKeys, function(props){
     propKeys.forEach(function(key){
         document.getElementById('prop-'+key).value = props[key];

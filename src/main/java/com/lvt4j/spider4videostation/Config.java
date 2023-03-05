@@ -34,6 +34,8 @@ public class Config {
     private int fileEpOffset;
     private int siteEpOffset;
     
+    private String originalAvailable;
+    
     private String javdbOrigin;
     private String javdbTouchUrl;
 //    private int javdbTimeoutMillis;

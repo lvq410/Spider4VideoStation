@@ -59,8 +59,9 @@ cacheExpireDuration: 2592000000
 
 fileEpOffset: 0
 siteEpOffset: 0
+originalAvailable: ""
 
-javdbOrigin: https://javdb007.com
+javdbOrigin: https://javdb008.com
 javdbTouchUrl: ${javdbOrigin}/manifest.json
 javdbTimeoutMillis: 30000
 
