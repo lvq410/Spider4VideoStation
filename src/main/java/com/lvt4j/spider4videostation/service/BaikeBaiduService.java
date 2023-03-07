@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -19,6 +20,7 @@ import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import org.apache.commons.collections4.CollectionUtils;
@@ -464,19 +466,24 @@ public class BaikeBaiduService implements SpiderService {
         
         Date makeDate = parseDate.apply(basicInfos.get("出品时间"));
         Date beOnDate = parseDate.apply(basicInfos.get("上映时间"));
+        Date playBeginDate = parseDate.apply(basicInfos.get("播放期间"));
         Date releaseDate = parseDate.apply(basicInfos.get("发行日期"));
         Date releaseTime = parseDate.apply(basicInfos.get("发行时间"));
         Date firstPlayTime = parseDate.apply(basicInfos.get("首播时间"));
-        Date playBeginDate = parseDate.apply(basicInfos.get("播放期间"));
         Date hkPlayDate = parseDate.apply(basicInfos.get("香港首播"));
         
-        Date original_available = ObjectUtils.firstNonNull(beOnDate, releaseTime, releaseDate, makeDate, firstPlayTime, playBeginDate, hkPlayDate);
-        if(original_available==null) return StringUtils.EMPTY;
-        return DateFormatUtils.format(original_available, "yyyy-MM-dd");
+        Date original_available = ObjectUtils.firstNonNull(beOnDate, releaseTime, playBeginDate, releaseDate, makeDate, firstPlayTime, hkPlayDate);
+        if(original_available!=null) return DateFormatUtils.format(original_available, "yyyy-MM-dd");
+        
+        //尝试扫所有基础信息的值，进行时间提取
+        original_available = basicInfos.values().stream().map(parseDate).findFirst().orElse(null);
+        if(original_available!=null) return DateFormatUtils.format(original_available, "yyyy-MM-dd");
+        
+        return StringUtils.EMPTY;
     }
     
     private Map<String, String> basicInfos(Elements basicNameEles) {
-        Map<String, String> basicInfos = new HashMap<>();
+        Map<String, String> basicInfos = new LinkedHashMap<>();
         for(Element basicNameEle : basicNameEles){
             String name = basicNameEle.text().trim();
             if(StringUtils.isBlank(name)) continue;
@@ -497,20 +504,50 @@ public class BaikeBaiduService implements SpiderService {
             @Override
             public String apply(Element paraEle) {
                 if(paraEle==null) return null;
-                List<String> paras = new LinkedList<>();
-                while(paraEle!=null && paraEle.is(".para")){
-                    paraEle.select("div.lemma-picture").remove();
-                    paraEle.select("a.lemma-album").remove();
-                    paraEle.select("sup").remove();
-                    paraEle.select("a.sup-anchor").remove();
-                    String para = paraEle.text().trim();
-                    if(StringUtils.isNotBlank(para)){
-                        para = "　　"+para;
-                        paras.add(para);
-                    }
-                    paraEle = paraEle.nextElementSibling();
+                if(paraEle.hasClass("para")){
+                    return para(paraEle);
+                }else if(paraEle.hasClass("para-title")){
+                    return paraTitle(paraEle);
                 }
-                return StringUtils.join(paras, "\n");
+                return null;
+            }
+            private String para(Element paraEle) {
+                paraEle.select("div.lemma-picture").remove();
+                paraEle.select("a.lemma-album").remove();
+                paraEle.select("sup").remove();
+                paraEle.select("a.sup-anchor").remove();
+                paraEle.select("div.lemma-album-marquee").remove();
+                String para = paraEle.text().trim();
+                if(StringUtils.isBlank(para)) return null;
+                return "　　"+para;
+            }
+            private String paraTitle(Element paraEle) {
+                paraEle.select("span.title-prefix").remove();
+                String para = paraEle.text().trim();
+                if(StringUtils.isBlank(para)) return null;
+                return para;
+            }
+        };
+        
+        Function<Element, List<Element>> collectAnchorParas = new Function<Element, List<Element>>() {
+            @Override
+            public List<Element> apply(Element anchor) {
+                if(anchor==null) return null;
+                Element titleDiv = Optional.ofNullable(anchor.parent()).map(e->e.nextElementSibling()).orElse(null);
+                if(titleDiv==null) return null;
+                String levelClass = IntStream.range(1, 4).mapToObj(i->"level-"+i).filter(c->titleDiv.hasClass(c)).findFirst().orElse(null);
+                if(StringUtils.isBlank(levelClass)) return null;
+
+                List<Element> paras = new LinkedList<>();
+                Element nextElementSibling = titleDiv;
+                while((nextElementSibling=nextElementSibling.nextElementSibling())!=null){
+                    if(nextElementSibling.hasClass(levelClass)) break;
+                    if(nextElementSibling.hasClass("para") || nextElementSibling.hasClass("para-title")){
+                        paras.add(nextElementSibling);
+                        continue;
+                    }
+                }
+                return paras;
             }
         };
         
@@ -518,12 +555,17 @@ public class BaikeBaiduService implements SpiderService {
         Element storyAnchor = doc.selectFirst("div.anchor-list a[name=故事简介].lemma-anchor");
         Element storySummaryAnchor = doc.selectFirst("div.anchor-list a[name=故事概要].lemma-anchor");
         Element summaryAnchor = ObjectUtils.firstNonNull(plotAnchor, storyAnchor, storySummaryAnchor);
-        if(summaryAnchor!=null){
-            Element paraEle = Optional.ofNullable(summaryAnchor.parent()).map(e->e.nextElementSibling()).map(e->e.nextElementSibling()).orElse(null);
-            if(paraEle!=null) return paraEleExtract.apply(paraEle);
+        List<Element> paras = collectAnchorParas.apply(summaryAnchor);
+        if(paras!=null){
+            String summary = paras.stream().map(paraEleExtract).filter(StringUtils::isNotBlank).collect(Collectors.joining("\n"));
+            if(StringUtils.isNotBlank(summary)) return summary;
         }
-        Element lemmaSummaryParaEle = doc.selectFirst("div.lemma-summary div.para");
-        if(lemmaSummaryParaEle!=null) return paraEleExtract.apply(lemmaSummaryParaEle);
+        
+        Elements lemmaSummaryParas = doc.select("div.lemma-summary div.para");
+        if(lemmaSummaryParas!=null){
+            String summary = lemmaSummaryParas.stream().map(paraEleExtract).filter(StringUtils::isNotBlank).collect(Collectors.joining("\n"));
+            if(StringUtils.isNotBlank(summary)) return summary;
+        }
         
         return StringUtils.EMPTY;
     }
