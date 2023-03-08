@@ -476,7 +476,7 @@ public class BaikeBaiduService implements SpiderService {
         if(original_available!=null) return DateFormatUtils.format(original_available, "yyyy-MM-dd");
         
         //尝试扫所有基础信息的值，进行时间提取
-        original_available = basicInfos.values().stream().map(parseDate).findFirst().orElse(null);
+        original_available = basicInfos.values().stream().map(parseDate).filter(Objects::nonNull).findFirst().orElse(null);
         if(original_available!=null) return DateFormatUtils.format(original_available, "yyyy-MM-dd");
         
         return StringUtils.EMPTY;
