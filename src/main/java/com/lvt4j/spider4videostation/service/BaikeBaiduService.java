@@ -506,7 +506,7 @@ public class BaikeBaiduService implements SpiderService {
                 if(paraEle==null) return null;
                 if(paraEle.hasClass("para")){
                     return para(paraEle);
-                }else if(paraEle.hasClass("para-title")){
+                }else if(paraEle.hasClass("para-title") || paraEle.is("caption")){
                     return paraTitle(paraEle);
                 }
                 return null;
@@ -544,6 +544,11 @@ public class BaikeBaiduService implements SpiderService {
                     if(nextElementSibling.hasClass(levelClass)) break;
                     if(nextElementSibling.hasClass("para") || nextElementSibling.hasClass("para-title")){
                         paras.add(nextElementSibling);
+                        continue;
+                    }
+                    Elements nestParas = nextElementSibling.select(".para , .para-title , caption");
+                    if(!nestParas.isEmpty()){
+                        paras.addAll(nestParas);
                         continue;
                     }
                 }
