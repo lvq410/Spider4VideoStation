@@ -551,10 +551,8 @@ public class BaikeBaiduService implements SpiderService {
             }
         };
         
-        Element plotAnchor = doc.selectFirst("div.anchor-list a[name=剧情简介].lemma-anchor");
-        Element storyAnchor = doc.selectFirst("div.anchor-list a[name=故事简介].lemma-anchor");
-        Element storySummaryAnchor = doc.selectFirst("div.anchor-list a[name=故事概要].lemma-anchor");
-        Element summaryAnchor = ObjectUtils.firstNonNull(plotAnchor, storyAnchor, storySummaryAnchor);
+        Element summaryAnchor = Stream.of("剧情简介","故事简介","故事概要","故事梗概")
+            .map(n->"div.anchor-list a[name="+n+"].lemma-anchor").map(doc::selectFirst).filter(Objects::nonNull).findFirst().orElse(null);
         List<Element> paras = collectAnchorParas.apply(summaryAnchor);
         if(paras!=null){
             String summary = paras.stream().map(paraEleExtract).filter(StringUtils::isNotBlank).collect(Collectors.joining("\n"));
