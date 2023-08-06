@@ -801,7 +801,8 @@ public class DoubanService implements SpiderService {
             if(coverImg==null) continue;
             String coverUrl = coverImg.absUrl("src");
             if(StringUtils.isBlank(coverUrl)) continue;
-            coverUrl = coverUrl.replace("view/photo/m/public", "view/photo/1/public");
+//            coverUrl = coverUrl.replace("view/photo/m/public", "view/photo/1/public");
+//            coverUrl = coverUrl.replace("view/photo/m/public", "view/photo/raw/public");
             coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
             
             long w=0,h=0;

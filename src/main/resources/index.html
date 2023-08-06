@@ -62,6 +62,18 @@
                     <td><button id="prop-btn-originalAvailable" onclick="propChagne('originalAvailable')">设置</button></td>
                     <td>无视从源站解析出的发布日期，强制用该值</td>
                 </tr>
+                <tr>
+                    <td>豆瓣结果条数</td>
+                    <td><input id="prop-doubanMaxLimit"/></td>
+                    <td><button id="prop-btn-doubanMaxLimit" onclick="propChagne('doubanMaxLimit')">设置</button></td>
+                    <td>从豆瓣源搜索时最多返回多少条</td>
+                </tr>
+                <tr>
+                    <td>百度百科结果条数</td>
+                    <td><input id="prop-baikeBaiduMaxLimit"/></td>
+                    <td><button id="prop-btn-baikeBaiduMaxLimit" onclick="propChagne('baikeBaiduMaxLimit')">设置</button></td>
+                    <td>从百度百科源搜索时最多返回多少条</td>
+                </tr>
             </tbody>
         </table>
     </div>
@@ -76,7 +88,7 @@ for(var id in Plugins){
 document.getElementById('pluginType').innerHTML = pluginTypeOptionHtml;
 onPluginSelect();
 
-var propKeys = ['javdbOrigin','fileEpOffset','siteEpOffset','originalAvailable'];
+var propKeys = ['javdbOrigin','fileEpOffset','siteEpOffset','originalAvailable','doubanMaxLimit','baikeBaiduMaxLimit'];
 post('prop/gets', propKeys, function(props){
     propKeys.forEach(function(key){
         document.getElementById('prop-'+key).value = props[key];
