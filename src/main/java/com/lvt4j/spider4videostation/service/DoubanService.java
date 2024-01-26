@@ -270,6 +270,7 @@ public class DoubanService implements SpiderService {
                 }
                 break;
             case "上映日期:":
+            case "首播:":
                 Element initialReleaseDateSpan = contentDiv.selectFirst("#info span[property='v:initialReleaseDate']");
                 if(initialReleaseDateSpan!=null){
                     String initialReleaseDate = initialReleaseDateSpan.text().trim();

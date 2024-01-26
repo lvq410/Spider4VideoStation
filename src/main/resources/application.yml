@@ -61,7 +61,7 @@ fileEpOffset: 0
 siteEpOffset: 0
 originalAvailable: ""
 
-javdbOrigin: https://javdb008.com
+javdbOrigin: https://javdb.com
 javdbTouchUrl: ${javdbOrigin}/manifest.json
 javdbTimeoutMillis: 30000
 
