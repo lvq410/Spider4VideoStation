@@ -44,10 +44,11 @@ public class StaticController {
     @GetMapping
     public void proxy(HttpServletResponse response,
             @RequestParam String url,
+            @RequestParam("service") String serviceName,
             @RequestParam(value="mediaType",required=false) String mediaTypeStr) throws Throwable {
         byte[] bs = cacher.load(url);
         if(bs==null) {
-            bs = service.down(url);
+            bs = service.down(url, serviceName);
             if(bs==null){
                 response.setStatus(404);
                 return;
@@ -89,13 +90,14 @@ public class StaticController {
         return data;
     }
     
-    public String jpgWrap(String publishPrefix, String url) {
-        return staticWrap(publishPrefix, url, MediaType.IMAGE_JPEG_VALUE);
+    public String jpgWrap(String publishPrefix, String url, String service) {
+        return staticWrap(publishPrefix, url, service, MediaType.IMAGE_JPEG_VALUE);
     }
-    private String staticWrap(String publishPrefix, String url, String mediaType) {
+    private String staticWrap(String publishPrefix, String url, String service, String mediaType) {
         return UriComponentsBuilder.fromHttpUrl(publishPrefix)
                 .path("static")
                 .queryParam("url", url)
+                .queryParam("service", service)
                 .queryParam("mediaType", mediaType)
                 .toUriString();
     }

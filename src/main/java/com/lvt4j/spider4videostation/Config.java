@@ -36,9 +36,11 @@ public class Config {
     
     private String originalAvailable;
     
+    private String javdbDomain;
     private String javdbOrigin;
     private String javdbTouchUrl;
 //    private int javdbTimeoutMillis;
+    private String javdbProxy;
     
     private String doubanDomain;
     private String doubanOrigin;

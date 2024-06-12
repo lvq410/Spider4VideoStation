@@ -7,7 +7,10 @@ import java.math.RoundingMode;
 import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
+
+import javax.annotation.PostConstruct;
 
 import org.apache.commons.lang3.StringUtils;
 import org.apache.commons.lang3.math.NumberUtils;
@@ -15,6 +18,8 @@ import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.openqa.selenium.Cookie;
+import org.openqa.selenium.PageLoadStrategy;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
@@ -26,6 +31,8 @@ import com.lvt4j.spider4videostation.controller.StaticController;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Movie;
 import com.lvt4j.spider4videostation.pojo.Rst;
+import com.lvt4j.spider4videostation.service.Drivers.DriverMeta;
+import com.lvt4j.spider4videostation.service.Drivers.Type;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -38,6 +45,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class JavdbService implements SpiderService {
 
+    public static final String Name = "javdb";
+    
     private static final List<PluginType> SupportPluginTypes = Arrays.asList(PluginType.AV_Normal, PluginType.AV_StrictId);
     
     @Autowired
@@ -51,6 +60,31 @@ public class JavdbService implements SpiderService {
     
     @Autowired
     private Drivers drivers;
+    
+    private DriverMeta driver;
+    
+    @PostConstruct
+    private void init(){
+        driver = drivers.driver(Name, Type.Searcher);
+        DriverMeta staticDriver = drivers.driver(Name, Type.Staticer);
+        for(DriverMeta dm: Arrays.asList(driver, staticDriver)){
+            dm.optionsCustom(opts->{
+                opts.setPageLoadStrategy(PageLoadStrategy.EAGER);
+                if(StringUtils.isNotBlank(config.getJavdbProxy())) {
+                    opts.addArguments("--proxy-server="+config.getJavdbProxy());
+                }
+            });
+            dm.driverCustom(driver->{
+                log.info("init javdb cookie, open touch url {}", config.getJavdbTouchUrl());
+                driver.get(config.getJavdbTouchUrl());
+                Date cookieExpire = new Date(System.currentTimeMillis()+365*24*60*60*1000);
+                driver.manage().addCookie(new Cookie("list_mode", "v",    null, "/", cookieExpire));
+                driver.manage().addCookie(new Cookie("over18",    "1",    null, "/", cookieExpire));
+                driver.manage().addCookie(new Cookie("locale",    "zh",   null, "/", cookieExpire));
+                driver.manage().addCookie(new Cookie("theme",     "auto", null, "/", cookieExpire));
+            });
+        }
+    }
     
     @Override
     public boolean support(PluginType plugin, Args args) {
@@ -118,7 +152,7 @@ public class JavdbService implements SpiderService {
             if(coverImg!=null){
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
+                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
                 }
             }
             
@@ -166,7 +200,7 @@ public class JavdbService implements SpiderService {
         if(coverImg!=null) {
             coverUrl = coverImg.absUrl("src");
             if(StringUtils.isNotBlank(coverUrl)){
-                coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
+                coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
                 movie.extra().poster.add(coverUrl);
             }
         }
@@ -241,7 +275,7 @@ public class JavdbService implements SpiderService {
         for(Element previewA : previewAs){
             String previewUrl = previewA.absUrl("href");
             if(StringUtils.isBlank(previewUrl)) continue;
-            previewUrl = staticController.jpgWrap(publishPrefix, previewUrl);
+            previewUrl = staticController.jpgWrap(publishPrefix, previewUrl, Name);
             movie.extra().backdrop.add(previewUrl);
         }
         if(previewAs.isEmpty()){ //无预览图时，用回大封面做背景图
@@ -270,7 +304,7 @@ public class JavdbService implements SpiderService {
         String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
         
-        return drivers.searchOpen(url, (driver,src)->{
+        return driver.open(url, (driver,src)->{
             if(url.equals(driver.getCurrentUrl())) cacher.saveAsStr(url, src);
             return src;
         });

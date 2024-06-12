@@ -6,7 +6,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
+import com.lvt4j.spider4videostation.Config;
 import com.lvt4j.spider4videostation.Utils;
+import com.lvt4j.spider4videostation.service.Drivers.Type;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -22,13 +24,28 @@ class StaticServiceByXhrSync implements StaticService {
     private static final String Tpl_Script = Utils.res("/script/tpl_down_xhr.js");
     
     @Autowired
+    private Config config;
+    
+    @Autowired
     private Drivers drivers;
     
     @Override
-    public byte[] down(String url) throws Throwable {
+    public byte[] down(String url, String service) throws Throwable {
         log.info("downloading static {}", url);
         String script = Tpl_Script.replace("@@OrigUrl@@", url);
-        return drivers.staticOpen("about:blank", driver->{
+        String touchUrl = null;
+        switch (service){
+        case DoubanService.Name:
+            touchUrl = config.getDoubanTouchUrl();
+            break;
+        case JavdbService.Name:
+            touchUrl = config.getJavdbTouchUrl();
+            break;
+        default:
+            touchUrl = "about:blank";
+            break;
+        }
+        return drivers.driver(service, Type.Staticer).open(touchUrl, driver->{
             log.trace("send down xhr script");
             String b64 = (String) driver.executeScript(script);
             log.trace("downed b64 length : {}", b64.length());

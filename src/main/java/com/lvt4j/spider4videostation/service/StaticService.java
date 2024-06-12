@@ -6,6 +6,6 @@ package com.lvt4j.spider4videostation.service;
  */
 public interface StaticService {
 
-    public byte[] down(String url) throws Throwable;
+    public byte[] down(String url, String service) throws Throwable;
     
 }

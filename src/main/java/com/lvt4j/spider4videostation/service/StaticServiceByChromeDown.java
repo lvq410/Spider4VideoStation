@@ -16,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.lvt4j.spider4videostation.Config;
 import com.lvt4j.spider4videostation.Utils;
+import com.lvt4j.spider4videostation.service.Drivers.Type;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -44,10 +45,10 @@ class StaticServiceByChromeDown implements StaticService {
     }
     
     @Override
-    public byte[] down(String url) throws Throwable {
+    public byte[] down(String url, String service) throws Throwable {
         log.info("downloading static {}", url);
         synchronized(folder){
-            return drivers.staticOpen(url, driver->{
+            return drivers.driver(service, Type.Staticer).open(url, driver->{
                 return sendScriptAndWaitFile(driver);
             });
         }

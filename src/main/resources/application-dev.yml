@@ -1,5 +1,5 @@
 #本地测试docker脚本：
-#docker run -p 24444:4444 -p 17900:7900 --shm-size="2g" -u root -e SE_VNC_NO_PASSWORD=1 -e SE_NODE_MAX_SESSIONS=8 -e SE_NODE_OVERRIDE_MAX_SESSIONS=true -e SE_SCREEN_WIDTH=1920 -e SE_SCREEN_HEIGHT=1080 -e SE_SCREEN_DEPTH=16 -v E:\Download\Spider4VideoStationStatic:/home/seluser/Downloads selenium/standalone-chrome:107.0.5304.87-chromedriver-107.0.5304.62-grid-4.6.0-20221104
+#docker run --name selenium -p 24444:4444 -p 17900:7900 --shm-size="2g" -u root -e SE_VNC_NO_PASSWORD=1 -e SE_NODE_MAX_SESSIONS=8 -e SE_NODE_OVERRIDE_MAX_SESSIONS=true -e SE_SCREEN_WIDTH=1920 -e SE_SCREEN_HEIGHT=1080 -e SE_SCREEN_DEPTH=16 -v E:\Download\Spider4VideoStationStatic:/home/seluser/Downloads selenium/standalone-chrome:107.0.5304.87-chromedriver-107.0.5304.62-grid-4.6.0-20221104
 
 #本地集成镜像测试docker脚本
 #docker run -p 34444:4444 -p 37900:7900 -p 33333:33333 --shm-size="2g" -e javdbOrigin=https://javdb006.com lvq410/spider4videostation:dev1
@@ -10,13 +10,12 @@ spring:
 
 logging:
   level:
-    com.lvt4j.spider4videostation: info
+    com.lvt4j.spider4videostation: trace
 
 webDriverAddr: http://127.0.0.1:24444
 webDriverArgs:
 #- "--headless"
 - "--disable-gpu"
-- "--disable-extensions"
 - "--disable-browser-side-navigation"
 - "--disable-dev-shm-usage"
 - "--blink-settings=imagesEnabled=false"
@@ -24,7 +23,16 @@ webDriverArgs:
 - "--start-maximized"
 - "--enable-automation"
 
+staticWebDriverArgs:
+- "--disable-gpu"
+- "--disable-extensions"
+- "--disable-browser-side-navigation"
+- "--disable-dev-shm-usage"
+- "--disable-web-security"
+- "--no-sandbox"
+- "--start-maximized"
+- "--enable-automation"
 #staticMode: chromeDown
 staticChromeDownloadFolder: E:\Download\Spider4VideoStationStatic
 
-javdbOrigin: https://javdb008.com
+javdbDomain: javdb.com

@@ -19,6 +19,9 @@ public class Consts {
 
     public static final AntPathMatcher PathMatcher = new AntPathMatcher();
     
+    public static final String Tpl_LatestXHr_Script = Utils.res("/script/tpl_latest_xhr.js");
+    public static final String Tpl_Orig_Html = Utils.res("/script/orig_html.js");
+    
     public static final File Folder_Cache = new File("cache");
     public static final File Folder_Cookies = new File("cookies");
     

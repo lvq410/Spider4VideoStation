@@ -31,7 +31,6 @@ webDriverAddr: http://127.0.0.1:4444
 webDriverArgs:
 #- "--headless"
 - "--disable-gpu"
-- "--disable-extensions"
 - "--disable-browser-side-navigation"
 - "--disable-dev-shm-usage"
 - "--blink-settings=imagesEnabled=false"
@@ -46,7 +45,7 @@ staticWebDriverArgs:
 - "--disable-extensions"
 - "--disable-browser-side-navigation"
 - "--disable-dev-shm-usage"
-- "--disable-web-security"
+- "--disable-web-security" # xhr请求图片资源时，避免CORS
 - "--no-sandbox"
 - "--start-maximized"
 - "--enable-automation"
@@ -61,9 +60,11 @@ fileEpOffset: 0
 siteEpOffset: 0
 originalAvailable: ""
 
-javdbOrigin: https://javdb.com
+javdbDomain: javdb.com
+javdbOrigin: https://${javdbDomain}
 javdbTouchUrl: ${javdbOrigin}/manifest.json
 javdbTimeoutMillis: 30000
+javdbProxy: null
 
 doubanDomain: douban.com
 doubanOrigin: https://${doubanDomain}

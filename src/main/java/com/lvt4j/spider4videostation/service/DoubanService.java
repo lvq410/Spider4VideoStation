@@ -1,5 +1,6 @@
 package com.lvt4j.spider4videostation.service;
 
+import static com.lvt4j.spider4videostation.Consts.Folder_Cookies;
 import static com.lvt4j.spider4videostation.Consts.PathMatcher;
 import static com.lvt4j.spider4videostation.Utils.isUrl;
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
@@ -9,6 +10,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
+
+import javax.annotation.PostConstruct;
 
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.lang3.SerializationUtils;
@@ -29,6 +33,7 @@ import org.jsoup.nodes.Element;
 import org.jsoup.nodes.Node;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.Cookie;
+import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Lazy;
@@ -47,6 +52,8 @@ import com.lvt4j.spider4videostation.pojo.Movie;
 import com.lvt4j.spider4videostation.pojo.Rst;
 import com.lvt4j.spider4videostation.pojo.TvShow;
 import com.lvt4j.spider4videostation.pojo.TvShowEpisode;
+import com.lvt4j.spider4videostation.service.Drivers.DriverMeta;
+import com.lvt4j.spider4videostation.service.Drivers.Type;
 
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
@@ -59,6 +66,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class DoubanService implements SpiderService {
 
+    public static final String Name = "douban";
+    
     private static final String SubjectPattern = "/subject/*/";
     private static final String EpisodePattern = "/subject/{subjectId}/episode/{epIdx}/";
     
@@ -76,6 +85,24 @@ public class DoubanService implements SpiderService {
     private StaticController staticController;
     @Autowired@Lazy
     private DoubanController doubanController;
+    
+    private DriverMeta driver, staticDriver;
+    
+    @PostConstruct
+    private void init(){
+        driver = drivers.driver(Name, Type.Searcher);
+        staticDriver = drivers.driver(Name, Type.Staticer);
+        for(DriverMeta dm: Arrays.asList(driver, staticDriver)){
+            dm.optionsCustom(opts->{
+                opts.setPageLoadStrategy(PageLoadStrategy.EAGER);
+            });
+            dm.driverCustom(driver->{
+                log.info("init douban cookie, open touch url {}", config.getDoubanTouchUrl());
+                driver.get(config.getDoubanTouchUrl());
+                drivers.loadCookie(driver, new File(Folder_Cookies, config.getDoubanDomain()));
+            });
+        }
+    }
     
     @Override
     public boolean support(PluginType plugin, Args args) {
@@ -166,7 +193,7 @@ public class DoubanService implements SpiderService {
             if(coverImg!=null) {
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
+                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
                 }
             }
             
@@ -218,7 +245,7 @@ public class DoubanService implements SpiderService {
             if(mainpicImg!=null){
                 String posterUrl = mainpicImg.absUrl("src");
                 if(StringUtils.isNotBlank(posterUrl)){
-                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl);
+                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl, Name);
                     movie.extra().poster.add(posterUrl);
                 }
             }
@@ -367,7 +394,7 @@ public class DoubanService implements SpiderService {
             if(coverImg!=null) {
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
+                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
                 }
             }
             
@@ -419,7 +446,7 @@ public class DoubanService implements SpiderService {
             if(mainpicImg!=null){
                 String posterUrl = mainpicImg.absUrl("src");
                 if(StringUtils.isNotBlank(posterUrl)){
-                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl);
+                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl, Name);
                     tvShow.extra().poster.add(posterUrl);
                 }
             }
@@ -541,7 +568,7 @@ public class DoubanService implements SpiderService {
             if(coverImg!=null) {
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
+                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
                 }
             }
             
@@ -582,7 +609,7 @@ public class DoubanService implements SpiderService {
             if(mainpicImg!=null){
                 String posterUrl = mainpicImg.absUrl("src");
                 if(StringUtils.isNotBlank(posterUrl)){
-                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl);
+                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl, Name);
                     tvShow.extra().poster.add(posterUrl);
                 }
             }
@@ -804,7 +831,7 @@ public class DoubanService implements SpiderService {
             if(StringUtils.isBlank(coverUrl)) continue;
 //            coverUrl = coverUrl.replace("view/photo/m/public", "view/photo/1/public");
 //            coverUrl = coverUrl.replace("view/photo/m/public", "view/photo/raw/public");
-            coverUrl = staticController.jpgWrap(publishPrefix, coverUrl);
+            coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
             
             long w=0,h=0;
             Element propDiv = li.selectFirst("div.prop");
@@ -840,7 +867,8 @@ public class DoubanService implements SpiderService {
         String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
         
-        return drivers.searchOpen(url, (driver, src)->{
+        
+        return driver.open(url, (driver, src)->{
             if(!isLogined(src)){
                 log.error("未登录，需先登录！");
                 throw new RuntimeException("未登录");
@@ -854,7 +882,7 @@ public class DoubanService implements SpiderService {
         String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
         
-        byte[] bs = staticService.down(url);
+        byte[] bs = staticService.down(url, Name);
         cacher.save(url, bs);
         return new String(bs);
     }
@@ -897,7 +925,7 @@ public class DoubanService implements SpiderService {
         LoginState state = new LoginState();
         
         log.info("redirect login check url : {}", config.getDoubanLoginCheckUrl());
-        drivers.searchOpen(config.getDoubanLoginCheckUrl(), (driver, src)->{
+        driver.open(config.getDoubanLoginCheckUrl(), (driver, src)->{
             state.logined = isLogined(src);
             return null;
         });
@@ -905,16 +933,16 @@ public class DoubanService implements SpiderService {
         if(state.logined) return state;
         
         log.info("staticer destory");
-        drivers.staticerDestory();
+        staticDriver.destory();
         
         log.info("redirect login url : {}", config.getDoubanLoginUrl());
-        drivers.searchOpen(config.getDoubanLoginUrl(), (driver, src)->{
+        driver.open(config.getDoubanLoginUrl(), (driver, src)->{
             log.trace("try find login switch btn and click it");
             driver.findElementByCssSelector(".quick.icon-switch").click();
             
             String qrLoginImgUrl = driver.findElementByCssSelector("div.account-qr-scan img").getAttribute("src");
             log.trace("found qr login img : {}", qrLoginImgUrl);
-            state.qrLoginImg = staticController.jpgWrap(publishPrefix, qrLoginImgUrl);
+            state.qrLoginImg = staticController.jpgWrap(publishPrefix, qrLoginImgUrl, Name);
             return null;
         });
         return state;
@@ -929,9 +957,9 @@ public class DoubanService implements SpiderService {
      */
     @SneakyThrows
     public synchronized LoginState checkLoginSuccess() {
-        if(!drivers.isSearcherInited()) throw new ResponseStatusException(BAD_REQUEST, "请先进行登录");
+        if(!driver.isInited()) throw new ResponseStatusException(BAD_REQUEST, "请先进行登录");
         
-        drivers.searchDo(driver->{
+        driver._do(driver->{
             Utils.waitUntil(()->{
                 return isLogined(driver);
             }, config.getDoubanLoginWaitTimeoutMillis());
