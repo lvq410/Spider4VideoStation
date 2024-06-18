@@ -12,8 +12,8 @@ cd $shellDir
 shellDir=`pwd`
 
 #分支名为标签名
-#tag=`git branch | grep '*' | awk -F ' ' '{print $2}'`
-tag='dev1'
+tag=`git branch | grep '*' | awk -F ' ' '{print $2}'`
+#tag='dev1'
 echo "当前分支"$tag
 echo "开始构建spider4videostation:"$tag"镜像,项目路径："$shellDir
 #用gradle打出jar
@@ -26,8 +26,10 @@ mv ./build/libs/*.jar ./build/docker/app.jar
 sed 's/^M//g' ./Dockerfile > ./build/docker/Dockerfile
 sed 's/^M//g' ./start.sh > ./build/docker/start.sh
 sed 's/^M//g' ./spider4videostation.conf > ./build/docker/spider4videostation.conf
+mkdir ./build/docker/ChromeExtensions
+cp ChromeExtensions/XHRInterceptorExtension.crx ./build/docker/ChromeExtensions/XHRInterceptorExtension.crx
 cd ./build/docker
 #打镜像
 docker build -t lvq410/spider4videostation:$tag . 
 #推镜像
-docker push lvq410/spider4videostation:$tag
+#docker push lvq410/spider4videostation:$tag

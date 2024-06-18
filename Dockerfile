@@ -31,5 +31,6 @@ RUN chmod 777 -R /app
 
 # 在supervisor中添加启动配置
 ADD spider4videostation.conf /etc/supervisor/conf.d/spider4videostation.conf
+ADD ChromeExtensions /app/ChromeExtensions
 
 #USER seluser
