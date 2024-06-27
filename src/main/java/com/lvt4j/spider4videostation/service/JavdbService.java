@@ -304,10 +304,15 @@ public class JavdbService implements SpiderService {
         String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
         
-        return driver.open(url, (driver,src)->{
-            if(url.equals(driver.getCurrentUrl())) cacher.saveAsStr(url, src);
-            return src;
-        });
+        try{
+            return driver.open(url, (driver,src)->{
+                if(src.contains("Verify you are human")) throw new RuntimeException("出现人机验证");
+                if(url.equals(driver.getCurrentUrl())) cacher.saveAsStr(url, src);
+                return src;
+            });
+        }finally {
+            driver.destory();
+        }
     }
     
 }
