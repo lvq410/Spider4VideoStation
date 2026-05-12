@@ -1,11 +1,13 @@
 package com.lvt4j.spider4videostation;
 
-import org.springframework.boot.SpringApplication;
+import javax.swing.SwingUtilities;
+
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.boot.context.ApplicationPidFileWriter;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.scheduling.annotation.EnableScheduling;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+import com.lvt4j.spider4videostation.ui.MainStage;
 
 /**
  *
@@ -13,18 +15,24 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
  */
 @EnableScheduling
 @SpringBootApplication
-public class Spider4VideoStationApp implements WebMvcConfigurer {
+public class Spider4VideoStationApp {
 
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        registry.addResourceHandler("/static/**")
-            .addResourceLocations("classpath:/static/");
+    private static ConfigurableApplicationContext springContext;
+
+    public static void main(String[] args) {
+        springContext = new SpringApplicationBuilder(Spider4VideoStationApp.class)
+            .web(org.springframework.boot.WebApplicationType.NONE)
+            .headless(false)
+            .profiles("local")
+            .run();
+
+        SwingUtilities.invokeLater(() -> {
+            MainStage mainStage = springContext.getBean(MainStage.class);
+            mainStage.show();
+        });
     }
-    
-    public static void main(String[] args) throws Throwable {
-        SpringApplication app = new SpringApplication(Spider4VideoStationApp.class);
-        app.addListeners(new ApplicationPidFileWriter());
-        app.run(args);
+
+    public static <T> T getBean(Class<T> clazz) {
+        return springContext.getBean(clazz);
     }
-    
 }

@@ -82,7 +82,7 @@ public class FileCacher {
     }
     
     @SneakyThrows
-    static File cacheFile(String url) {
+    public static File cacheFile(String url) {
         URL u = new URL(url);
         String domain = u.getHost();
         

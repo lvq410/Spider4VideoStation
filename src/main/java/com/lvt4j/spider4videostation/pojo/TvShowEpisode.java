@@ -49,10 +49,6 @@ public class TvShowEpisode implements Serializable {
         extra = ImmutableMap.of(pluginId, new Extra());
     }
     
-    public void detailModeChange(String detailUrl) {
-        title = detailUrl;
-    }
-    
     public Extra extra() {
         return extra.get(pluginId);
     }

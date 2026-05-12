@@ -1,25 +1,7 @@
-management:
-  server.port: 33333
-  endpoints:
-    enabled-by-default: true
-    web.exposure.include: "*"
-  endpoint.health.show-details: never
-  health:
-    defaults.enabled: false
-    db.enabled: false
-  info.git.mode: full
-
-server.port: ${management.server.port}
-
 spring:
   main:
     banner-mode: "OFF"
   application.name: Spider4VideoStation
-  boot.admin.client:
-    enabled: false
-    url: http://localhost:25020
-    instance.prefer-ip: true
-    auto-deregistration: true
 
 logging:
   file: logs/spider4videostation.log
@@ -45,7 +27,7 @@ staticWebDriverArgs:
 - "--disable-extensions"
 - "--disable-browser-side-navigation"
 - "--disable-dev-shm-usage"
-- "--disable-web-security" # xhr请求图片资源时，避免CORS
+- "--disable-web-security"
 - "--no-sandbox"
 - "--start-maximized"
 - "--enable-automation"
@@ -54,7 +36,7 @@ staticLoadTimeoutMillis: 60000
 staticChromeDownloadFolder: /home/seluser/Downloads
 
 cacheMaxSize: 1073741824
-cacheExpireDuration: 2592000000  
+cacheExpireDuration: 2592000000
 
 fileEpOffset: 0
 siteEpOffset: 0

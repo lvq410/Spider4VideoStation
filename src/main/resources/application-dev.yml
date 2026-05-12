@@ -4,10 +4,6 @@
 #本地集成镜像测试docker脚本
 #docker run -p 34444:4444 -p 37900:7900 -p 33333:33333 --shm-size="2g" lvq410/spider4videostation:master
 
-spring:
-  boot.admin.client:
-    enabled: true
-
 logging:
   level:
     com.lvt4j.spider4videostation: trace

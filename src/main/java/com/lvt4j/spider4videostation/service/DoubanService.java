@@ -3,9 +3,9 @@ package com.lvt4j.spider4videostation.service;
 import static com.lvt4j.spider4videostation.Consts.Folder_Cookies;
 import static com.lvt4j.spider4videostation.Consts.PathMatcher;
 import static com.lvt4j.spider4videostation.Utils.isUrl;
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 import java.io.File;
+import java.net.URLEncoder;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URL;
@@ -36,17 +36,12 @@ import org.openqa.selenium.Cookie;
 import org.openqa.selenium.PageLoadStrategy;
 import org.openqa.selenium.remote.RemoteWebDriver;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import com.lvt4j.spider4videostation.Config;
 import com.lvt4j.spider4videostation.Consts;
-import com.lvt4j.spider4videostation.PluginType;
+import com.lvt4j.spider4videostation.TargetSite;
 import com.lvt4j.spider4videostation.Utils;
-import com.lvt4j.spider4videostation.controller.DoubanController;
-import com.lvt4j.spider4videostation.controller.StaticController;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Movie;
 import com.lvt4j.spider4videostation.pojo.Rst;
@@ -80,11 +75,8 @@ public class DoubanService implements SpiderService {
     private Drivers drivers;
     @Autowired
     private StaticService staticService;
-    
-    @Autowired@Lazy
-    private StaticController staticController;
-    @Autowired@Lazy
-    private DoubanController doubanController;
+    @Autowired
+    private ImageDownloadService imageDownloadService;
     
     private DriverMeta driver, staticDriver;
     
@@ -105,31 +97,31 @@ public class DoubanService implements SpiderService {
     }
     
     @Override
-    public boolean support(PluginType plugin, Args args) {
-        if(PluginType.Douban!=plugin) return false;
+    public boolean support(TargetSite plugin, Args args) {
+        if(TargetSite.Douban!=plugin) return false;
         if(!plugin.searchTypes.contains(args.type)) return false;
         if(!plugin.languages.contains(args.lang)) return false;
         return true;
     }
 
     @Override
-    public synchronized void search(String pluginId, String publishPrefix, PluginType pluginType, Args args, Rst rst) {
+    public synchronized void search(TargetSite targetSite, Args args, Rst rst) {
         switch(args.type){
         case "movie":
-            movie_search(pluginId, publishPrefix, args, rst);
+            movie_search(targetSite, args, rst);
             break;
         case "tvshow":
-            tvshow_search(pluginId, publishPrefix, args, rst);
+            tvshow_search(targetSite, args, rst);
             break;
         case "tvshow_episode":
-            tvshow_episode_search(pluginId, publishPrefix, args, rst);
+            tvshow_episode_search(targetSite, args, rst);
             break;
         default: break;
         }
     }
     
     @SneakyThrows
-    private void movie_search(String pluginId, String publishPrefix, Args args, Rst rst) {
+    private void movie_search(TargetSite targetSite, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
         if(isUrl(args.input.title)){
@@ -137,7 +129,7 @@ public class DoubanService implements SpiderService {
                 String detailUrl = args.input.title;
                 Movie movie = null;
                 try{
-                    movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
+                    movie = movie_loadItem(targetSite,detailUrl);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
                     return;
@@ -150,8 +142,7 @@ public class DoubanService implements SpiderService {
             return;
         }
         
-        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
-            .queryParam("search_text", args.input.title).toUriString();
+        String searchUrl = config.getDoubanSearchMovieUrl() + "?search_text=" + URLEncoder.encode(args.input.title, "UTF-8");
         log.info("open search {}", searchUrl);
         String searchCnt;
         try{
@@ -193,13 +184,13 @@ public class DoubanService implements SpiderService {
             if(coverImg!=null) {
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
+                    coverUrl = imageDownloadService.download(coverUrl, Name);
                 }
             }
             
             Movie movie = null;
             try{
-                movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
+                movie = movie_loadItem(targetSite,detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -208,7 +199,7 @@ public class DoubanService implements SpiderService {
             if(movie==null){ //未从详情页提取出信息
                 if(StringUtils.isNotBlank(title) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
                     //用列表上的数据
-                    movie = new Movie(pluginId);
+                    movie = new Movie(targetSite.name);
                     if(StringUtils.isNotBlank(title)) movie.title = title;
                     if(StringUtils.isNotBlank(coverUrl)) {
                         movie.extra().poster.add(0, coverUrl);
@@ -223,8 +214,8 @@ public class DoubanService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private Movie movie_loadItem(String pluginId, String publishPrefix, String detailUrl) {
-        Movie movie = new Movie(pluginId);
+    private Movie movie_loadItem(TargetSite targetSite, String detailUrl) {
+        Movie movie = new Movie(targetSite.name);
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);
@@ -245,7 +236,7 @@ public class DoubanService implements SpiderService {
             if(mainpicImg!=null){
                 String posterUrl = mainpicImg.absUrl("src");
                 if(StringUtils.isNotBlank(posterUrl)){
-                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl, Name);
+                    posterUrl = imageDownloadService.download(posterUrl, Name);
                     movie.extra().poster.add(posterUrl);
                 }
             }
@@ -253,7 +244,7 @@ public class DoubanService implements SpiderService {
             if(mainpicA!=null){
                 String mainpicUrl = mainpicA.absUrl("href");
                 if(StringUtils.isNotBlank(mainpicUrl)){
-                    loadBackdrops(mainpicUrl, movie.extra().backdrop, publishPrefix);
+                    loadBackdrops(mainpicUrl, movie.extra().backdrop);
                 }
             }
         }
@@ -329,7 +320,7 @@ public class DoubanService implements SpiderService {
     }
     
     @SneakyThrows
-    private void tvshow_search(String pluginId, String publishPrefix, Args args, Rst rst) {
+    private void tvshow_search(TargetSite targetSite, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
         if(isUrl(args.input.title)){
@@ -337,22 +328,20 @@ public class DoubanService implements SpiderService {
                 String detailUrl = args.input.title;
                 TvShow tvShow = null;
                 try{
-                    tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
+                    tvShow = tvshow_loadItem(targetSite,detailUrl);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
                     return;
                 }
                 if(tvShow==null) return;
-                
-                tvShow.detailModeChange(detailUrl);
+
                 rst.result.add(tvShow);
                 return;
             }
             return;
         }
-        
-        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
-            .queryParam("search_text", args.input.title).toUriString();
+
+        String searchUrl = config.getDoubanSearchMovieUrl() + "?search_text=" + URLEncoder.encode(args.input.title, "UTF-8");
         log.info("open search {}", searchUrl);
         String searchCnt;
         try{
@@ -394,13 +383,13 @@ public class DoubanService implements SpiderService {
             if(coverImg!=null) {
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
+                    coverUrl = imageDownloadService.download(coverUrl, Name);
                 }
             }
             
             TvShow tvShow = null;
             try{
-                tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
+                tvShow = tvshow_loadItem(targetSite,detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -409,7 +398,7 @@ public class DoubanService implements SpiderService {
             if(tvShow==null){ //未从详情页提取出信息
                 if(StringUtils.isNotBlank(title) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
                     //用列表上的数据
-                    tvShow = new TvShow(pluginId);
+                    tvShow = new TvShow(targetSite.name);
                     if(StringUtils.isNotBlank(title)) tvShow.title = title;
                     if(StringUtils.isNotBlank(coverUrl)) {
                         tvShow.extra().poster.add(0, coverUrl);
@@ -424,8 +413,8 @@ public class DoubanService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private TvShow tvshow_loadItem(String pluginId, String publishPrefix, String detailUrl) {
-        TvShow tvShow = new TvShow(pluginId);
+    private TvShow tvshow_loadItem(TargetSite targetSite, String detailUrl) {
+        TvShow tvShow = new TvShow(targetSite.name);
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);
@@ -446,7 +435,7 @@ public class DoubanService implements SpiderService {
             if(mainpicImg!=null){
                 String posterUrl = mainpicImg.absUrl("src");
                 if(StringUtils.isNotBlank(posterUrl)){
-                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl, Name);
+                    posterUrl = imageDownloadService.download(posterUrl, Name);
                     tvShow.extra().poster.add(posterUrl);
                 }
             }
@@ -454,7 +443,7 @@ public class DoubanService implements SpiderService {
             if(mainpicA!=null){
                 String mainpicUrl = mainpicA.absUrl("href");
                 if(StringUtils.isNotBlank(mainpicUrl)){
-                    loadBackdrops(mainpicUrl, tvShow.extra().backdrop, publishPrefix);
+                    loadBackdrops(mainpicUrl, tvShow.extra().backdrop);
                 }
             }
         }
@@ -490,7 +479,7 @@ public class DoubanService implements SpiderService {
     }
     
     @SneakyThrows
-    private void tvshow_episode_search(String pluginId, String publishPrefix, Args args, Rst rst) {
+    private void tvshow_episode_search(TargetSite targetSite, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getDoubanMaxLimit());
         
         if(isUrl(args.input.title)){
@@ -498,8 +487,7 @@ public class DoubanService implements SpiderService {
                 String detailUrl = args.input.title;
                 List<TvShowEpisode> episodes = null;
                 try{
-                    episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, null);
-                    episodes.forEach(ep->ep.detailModeChange(detailUrl));
+                    episodes = tvshow_episode_loadItem(targetSite,detailUrl, args.input.season, args.input.episode, null);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
                     return;
@@ -511,10 +499,10 @@ public class DoubanService implements SpiderService {
                 String episodeUrl = args.input.title;
                 Map<String, String> vars = PathMatcher.extractUriTemplateVariables(EpisodePattern, new URL(episodeUrl).getPath());
                 String subjectId = vars.get("subjectId");
-                String detailUrl = UriComponentsBuilder.fromHttpUrl(args.input.title).replacePath("/subject/"+subjectId+"/").toUriString();
+                String detailUrl = args.input.title.replaceAll("/subject/\\d+/.*", "") + "/subject/" + subjectId + "/";
                 List<TvShowEpisode> episodes = null;
                 try{
-                    episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, episodeUrl);
+                    episodes = tvshow_episode_loadItem(targetSite,detailUrl, args.input.season, args.input.episode, episodeUrl);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
                     return;
@@ -525,8 +513,7 @@ public class DoubanService implements SpiderService {
             return;
         }
         
-        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getDoubanSearchMovieUrl())
-            .queryParam("search_text", args.input.title).toUriString();
+        String searchUrl = config.getDoubanSearchMovieUrl() + "?search_text=" + URLEncoder.encode(args.input.title, "UTF-8");
         log.info("open search {}", searchUrl);
         String searchCnt;
         try{
@@ -568,13 +555,13 @@ public class DoubanService implements SpiderService {
             if(coverImg!=null) {
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
+                    coverUrl = imageDownloadService.download(coverUrl, Name);
                 }
             }
             
             List<TvShowEpisode> episodes = null;
             try{
-                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, args.input.season, args.input.episode, null);
+                episodes = tvshow_episode_loadItem(targetSite,detailUrl, args.input.season, args.input.episode, null);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -584,11 +571,11 @@ public class DoubanService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private List<TvShowEpisode> tvshow_episode_loadItem(String pluginId, String publishPrefix, String detailUrl, Integer season, Integer epIdx, String episodeUrl) {
+    private List<TvShowEpisode> tvshow_episode_loadItem(TargetSite targetSite, String detailUrl, Integer season, Integer epIdx, String episodeUrl) {
         List<TvShowEpisode> episodes = new LinkedList<>();
-        TvShowEpisode base = new TvShowEpisode(pluginId);
+        TvShowEpisode base = new TvShowEpisode(targetSite.name);
         if(season!=null) base.season = season;
-        TvShow tvShow = new TvShow(pluginId);
+        TvShow tvShow = new TvShow(targetSite.name);
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);
@@ -609,7 +596,7 @@ public class DoubanService implements SpiderService {
             if(mainpicImg!=null){
                 String posterUrl = mainpicImg.absUrl("src");
                 if(StringUtils.isNotBlank(posterUrl)){
-                    posterUrl = staticController.jpgWrap(publishPrefix, posterUrl, Name);
+                    posterUrl = imageDownloadService.download(posterUrl, Name);
                     tvShow.extra().poster.add(posterUrl);
                 }
             }
@@ -617,7 +604,7 @@ public class DoubanService implements SpiderService {
             if(mainpicA!=null){
                 String mainpicUrl = mainpicA.absUrl("href");
                 if(StringUtils.isNotBlank(mainpicUrl)){
-                    loadBackdrops(mainpicUrl, tvShow.extra().backdrop, publishPrefix);
+                    loadBackdrops(mainpicUrl, tvShow.extra().backdrop);
                 }
             }
         }
@@ -810,7 +797,7 @@ public class DoubanService implements SpiderService {
         return episode;
     }
     
-    private void loadBackdrops(String mainpicUrl, List<String> backdrops, String publishPrefix) {
+    private void loadBackdrops(String mainpicUrl, List<String> backdrops) {
         log.info("load backdrop list {}", mainpicUrl);
         String mainpicCnt = loadPage(mainpicUrl);
 //        String mainpicCnt = fetchPage(mainpicUrl);
@@ -831,7 +818,7 @@ public class DoubanService implements SpiderService {
             if(StringUtils.isBlank(coverUrl)) continue;
 //            coverUrl = coverUrl.replace("view/photo/m/public", "view/photo/1/public");
 //            coverUrl = coverUrl.replace("view/photo/m/public", "view/photo/raw/public");
-            coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
+            coverUrl = imageDownloadService.download(coverUrl, Name);
             
             long w=0,h=0;
             Element propDiv = li.selectFirst("div.prop");
@@ -921,7 +908,7 @@ public class DoubanService implements SpiderService {
      * 
      */
     @SneakyThrows
-    public synchronized LoginState login(String publishPrefix) {
+    public synchronized LoginState login() {
         LoginState state = new LoginState();
         
         log.info("redirect login check url : {}", config.getDoubanLoginCheckUrl());
@@ -942,7 +929,7 @@ public class DoubanService implements SpiderService {
             
             String qrLoginImgUrl = driver.findElementByCssSelector("div.account-qr-scan img").getAttribute("src");
             log.trace("found qr login img : {}", qrLoginImgUrl);
-            state.qrLoginImg = staticController.jpgWrap(publishPrefix, qrLoginImgUrl, Name);
+            state.qrLoginImg = qrLoginImgUrl;
             return null;
         });
         return state;
@@ -957,7 +944,7 @@ public class DoubanService implements SpiderService {
      */
     @SneakyThrows
     public synchronized LoginState checkLoginSuccess() {
-        if(!driver.isInited()) throw new ResponseStatusException(BAD_REQUEST, "请先进行登录");
+        if(!driver.isInited()) throw new IllegalStateException("请先进行登录");
         
         driver._do(driver->{
             Utils.waitUntil(()->{

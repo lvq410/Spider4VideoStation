@@ -10,6 +10,7 @@ import static java.util.stream.Collectors.joining;
 import java.io.File;
 import java.net.URI;
 import java.net.URL;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -46,16 +47,13 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.openqa.selenium.PageLoadStrategy;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.UriComponentsBuilder;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.lvt4j.spider4videostation.Config;
-import com.lvt4j.spider4videostation.PluginType;
-import com.lvt4j.spider4videostation.controller.StaticController;
+import com.lvt4j.spider4videostation.TargetSite;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Movie;
 import com.lvt4j.spider4videostation.pojo.Rst;
@@ -88,8 +86,8 @@ public class BaikeBaiduService implements SpiderService {
     @Autowired
     private Drivers drivers;
     
-    @Autowired@Lazy
-    private StaticController staticController;
+    @Autowired
+    private ImageDownloadService imageDownloadService;
     
     private DriverMeta driver;
     
@@ -103,31 +101,31 @@ public class BaikeBaiduService implements SpiderService {
     }
     
     @Override
-    public boolean support(PluginType plugin, Args args) {
-        if(PluginType.BaikeBaidu!=plugin) return false;
+    public boolean support(TargetSite plugin, Args args) {
+        if(TargetSite.BaikeBaidu!=plugin) return false;
         if(!plugin.searchTypes.contains(args.type)) return false;
         if(!plugin.languages.contains(args.lang)) return false;
         return true;
     }
 
     @Override
-    public synchronized void search(String pluginId, String publishPrefix, PluginType pluginType, Args args, Rst rst) {
+    public synchronized void search(TargetSite targetSite, Args args, Rst rst) {
         switch(args.type){
         case "movie":
-            movie_search(pluginId, publishPrefix, args, rst);
+            movie_search(targetSite, args, rst);
             break;
         case "tvshow":
-            tvshow_search(pluginId, publishPrefix, args, rst);
+            tvshow_search(targetSite, args, rst);
             break;
         case "tvshow_episode":
-            tvshow_episode_search(pluginId, publishPrefix, args, rst);
+            tvshow_episode_search(targetSite, args, rst);
             break;
         default:
             break;
         }
     }
     
-    private void movie_search(String pluginId, String publishPrefix, Args args, Rst rst) {
+    private void movie_search(TargetSite targetSite, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getBaikeBaiduMaxLimit());
         
         if(isUrl(args.input.title)){
@@ -136,7 +134,7 @@ public class BaikeBaiduService implements SpiderService {
                 
                 Movie movie = null;
                 try{
-                    movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
+                    movie = movie_loadItem(targetSite, detailUrl);
                 }catch(Throwable e){
                     log.error("error load detail {}", detailUrl, e);
                     return;
@@ -148,9 +146,14 @@ public class BaikeBaiduService implements SpiderService {
             }
             return;
         }
-        
-        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getBaikeBaiduSearchUrl())
-            .queryParam("word", args.input.title).toUriString();
+
+        String searchUrl;
+        try {
+            searchUrl = config.getBaikeBaiduSearchUrl() + "?word=" + URLEncoder.encode(args.input.title, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            log.error("encode search title fail", e);
+            return;
+        }
         log.info("open search {}", searchUrl);
         String searchCnt;
         try{
@@ -174,15 +177,14 @@ public class BaikeBaiduService implements SpiderService {
                 if(StringUtils.isBlank(detailUrl)) continue;
                 if(!isItemUrl(detailUrl)) continue;
                 URI url = new URI(detailUrl);
-                detailUrl = UriComponentsBuilder.fromUri(url)
-                    .scheme("https").replacePath(url.getPath()).toUriString();
+                detailUrl = "https://" + url.getHost() + url.getPath();
             }catch(Exception ig){
                 continue;
             }
             
             Movie movie = null;
             try{
-                movie = movie_loadItem(pluginId, publishPrefix, detailUrl);
+                movie = movie_loadItem(targetSite, detailUrl);
             }catch(Throwable e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -194,8 +196,8 @@ public class BaikeBaiduService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private Movie movie_loadItem(String pluginId, String publishPrefix, String detailUrl) throws Throwable {
-        Movie movie = new Movie(pluginId);
+    private Movie movie_loadItem(TargetSite targetSite, String detailUrl) throws Throwable {
+        Movie movie = new Movie(targetSite.name);
         
         log.info("load detail {}", detailUrl);
         Triple<Document, JsonNode, JsonNode> itemPage = loadItemPage(detailUrl, false);
@@ -218,13 +220,13 @@ public class BaikeBaiduService implements SpiderService {
         movie.original_available = original_available(cardInfos);
         movie.summary = summary(detailHtml);
         
-        loadPosterAndBackdrops(detailUrl, pageDataJson, movie.extra().poster, movie.extra().backdrop, publishPrefix);
+        loadPosterAndBackdrops(detailUrl, pageDataJson, movie.extra().poster, movie.extra().backdrop);
         
         return movie;
     }
     
     @SneakyThrows
-    private void tvshow_search(String pluginId, String publishPrefix, Args args, Rst rst) {
+    private void tvshow_search(TargetSite targetSite, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getBaikeBaiduMaxLimit());
         
         if(isUrl(args.input.title)){
@@ -232,22 +234,26 @@ public class BaikeBaiduService implements SpiderService {
                 String detailUrl = args.input.title;
                 TvShow tvShow = null;
                 try{
-                    tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
+                    tvShow = tvshow_loadItem(targetSite, detailUrl);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
                     return;
                 }
                 if(tvShow==null) return;
-                
-                tvShow.detailModeChange(detailUrl);
+
                 rst.result.add(tvShow);
                 return;
             }
             return;
         }
-        
-        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getBaikeBaiduSearchUrl())
-            .queryParam("word", args.input.title).toUriString();
+
+        String searchUrl;
+        try {
+            searchUrl = config.getBaikeBaiduSearchUrl() + "?word=" + URLEncoder.encode(args.input.title, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            log.error("encode search title fail", e);
+            return;
+        }
         log.info("open search {}", searchUrl);
         String searchCnt;
         try{
@@ -271,15 +277,14 @@ public class BaikeBaiduService implements SpiderService {
                 if(StringUtils.isBlank(detailUrl)) continue;
                 if(!isItemUrl(detailUrl)) continue;
                 URI url = new URI(detailUrl);
-                detailUrl = UriComponentsBuilder.fromUri(url)
-                    .scheme("https").replacePath(url.getPath()).toUriString();
+                detailUrl = "https://" + url.getHost() + url.getPath();
             }catch(Exception ig){
                 continue;
             }
             
             TvShow tvShow = null;
             try{
-                tvShow = tvshow_loadItem(pluginId, publishPrefix, detailUrl);
+                tvShow = tvshow_loadItem(targetSite, detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -291,8 +296,8 @@ public class BaikeBaiduService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private TvShow tvshow_loadItem(String pluginId, String publishPrefix, String detailUrl) throws Throwable {
-        TvShow tvShow = new TvShow(pluginId);
+    private TvShow tvshow_loadItem(TargetSite targetSite, String detailUrl) throws Throwable {
+        TvShow tvShow = new TvShow(targetSite.name);
         
         log.info("load detail {}", detailUrl);
         Triple<Document, JsonNode, JsonNode> itemPage = loadItemPage(detailUrl, false);
@@ -309,13 +314,13 @@ public class BaikeBaiduService implements SpiderService {
         tvShow.original_available = original_available(cardInfos);
         tvShow.summary = summary(detailHtml);
         
-        loadPosterAndBackdrops(detailUrl, pageDataJson, tvShow.extra().poster, tvShow.extra().backdrop, publishPrefix);
+        loadPosterAndBackdrops(detailUrl, pageDataJson, tvShow.extra().poster, tvShow.extra().backdrop);
         
         return tvShow;
     }
     
     @SneakyThrows
-    private void tvshow_episode_search(String pluginId, String publishPrefix, Args args, Rst rst) {
+    private void tvshow_episode_search(TargetSite targetSite, Args args, Rst rst) {
         args.limit = Math.min(args.limit, config.getBaikeBaiduMaxLimit());
         
         if(isUrl(args.input.title)){
@@ -323,8 +328,7 @@ public class BaikeBaiduService implements SpiderService {
                 String detailUrl = args.input.title;
                 List<TvShowEpisode> episodes = null;
                 try{
-                    episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, false, args.input.season, args.input.episode);
-                    episodes.forEach(ep->ep.detailModeChange(detailUrl));
+                    episodes = tvshow_episode_loadItem(targetSite, detailUrl, false, args.input.season, args.input.episode);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
                     return;
@@ -334,9 +338,14 @@ public class BaikeBaiduService implements SpiderService {
             }
             return;
         }
-        
-        String searchUrl = UriComponentsBuilder.fromHttpUrl(config.getBaikeBaiduSearchUrl())
-            .queryParam("word", args.input.title).toUriString();
+
+        String searchUrl;
+        try {
+            searchUrl = config.getBaikeBaiduSearchUrl() + "?word=" + URLEncoder.encode(args.input.title, "UTF-8");
+        } catch (java.io.UnsupportedEncodingException e) {
+            log.error("encode search title fail", e);
+            return;
+        }
         log.info("open search {}", searchUrl);
         String searchCnt;
         try{
@@ -360,15 +369,14 @@ public class BaikeBaiduService implements SpiderService {
                 if(StringUtils.isBlank(detailUrl)) continue;
                 if(!isItemUrl(detailUrl)) continue;
                 URI url = new URI(detailUrl);
-                detailUrl = UriComponentsBuilder.fromUri(url)
-                    .scheme("https").replacePath(url.getPath()).toUriString();
+                detailUrl = "https://" + url.getHost() + url.getPath();
             }catch(Exception ig){
                 continue;
             }
             
             List<TvShowEpisode> episodes = null;
             try{
-                episodes = tvshow_episode_loadItem(pluginId, publishPrefix, detailUrl, true, args.input.season, args.input.episode);
+                episodes = tvshow_episode_loadItem(targetSite, detailUrl, true, args.input.season, args.input.episode);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -378,11 +386,11 @@ public class BaikeBaiduService implements SpiderService {
             if(args.reachLimit(++rstNum)) break;
         }
     }
-    private List<TvShowEpisode> tvshow_episode_loadItem(String pluginId, String publishPrefix, String detailUrl, boolean strictMode, Integer season, Integer epIdx) throws Throwable {
+    private List<TvShowEpisode> tvshow_episode_loadItem(TargetSite targetSite, String detailUrl, boolean strictMode, Integer season, Integer epIdx) throws Throwable {
         List<TvShowEpisode> episodes = new LinkedList<>();
-        TvShowEpisode base = new TvShowEpisode(pluginId);
+        TvShowEpisode base = new TvShowEpisode(targetSite.name);
         if(season!=null) base.season = season;
-        TvShow tvShow = new TvShow(pluginId);
+        TvShow tvShow = new TvShow(targetSite.name);
         
         log.info("load detail {}", detailUrl);
         Triple<Document, JsonNode, JsonNode> itemPage = loadItemPage(detailUrl, true);
@@ -405,7 +413,7 @@ public class BaikeBaiduService implements SpiderService {
         tvShow.original_available = base.original_available = original_available(cardInfos);
         tvShow.summary = summary(detailHtml);
         
-        loadPosterAndBackdrops(detailUrl, pageDataJson, tvShow.extra().poster, tvShow.extra().backdrop, publishPrefix);
+        loadPosterAndBackdrops(detailUrl, pageDataJson, tvShow.extra().poster, tvShow.extra().backdrop);
         
         base.extra().tvshow = tvShow;
         
@@ -596,8 +604,8 @@ public class BaikeBaiduService implements SpiderService {
 //            }
 //        };
 //        
-//        posters.addAll(tryBest.apply(posterInfos).stream().map(url->staticController.jpgWrap(publishPrefix, url, Name)).collect(Collectors.toList()));
-//        backdrops.addAll(tryBest.apply(backdropInfos).stream().map(url->staticController.jpgWrap(publishPrefix, url, Name)).collect(Collectors.toList()));
+//        posters.addAll(tryBest.apply(posterInfos).stream().map(url->imageDownloadService.download(url, Name)).collect(Collectors.toList()));
+//        backdrops.addAll(tryBest.apply(backdropInfos).stream().map(url->imageDownloadService.download(url, Name)).collect(Collectors.toList()));
 //    }
 //    
 //    private String extractImgUrl(Element imgEle, String publishPrefix) {
@@ -610,7 +618,7 @@ public class BaikeBaiduService implements SpiderService {
 //                    URL u = new URL(url);
 //                    if(!PathMatcher.match(PicPattern, u.getPath())) return null;
 //                    String rawUrl = UriComponentsBuilder.fromHttpUrl(url).replaceQuery(null).toUriString();
-//                    return staticController.jpgWrap(publishPrefix, rawUrl, Name);
+//                    return imageDownloadService.download(rawUrl, Name);
 //                }catch(Exception ig){
 //                    return null;
 //                }
@@ -728,7 +736,7 @@ public class BaikeBaiduService implements SpiderService {
         return StringUtils.EMPTY;
     }
     @SneakyThrows
-    private void loadPosterAndBackdrops(String detailUrl, JsonNode pageData, List<String> posters, List<String> backdrops, String publishPrefix) {
+    private void loadPosterAndBackdrops(String detailUrl, JsonNode pageData, List<String> posters, List<String> backdrops) {
         
         Set<String> allPicUrls = new HashSet<>();
         List<Triple<String, Integer, Integer>> allPicInfos = new LinkedList<>(); //图片链接、宽、高
@@ -785,8 +793,8 @@ public class BaikeBaiduService implements SpiderService {
             }
         };
         
-        posters.addAll(tryBest.apply(posterInfos).stream().map(url->staticController.jpgWrap(publishPrefix, url, Name)).collect(Collectors.toList()));
-        backdrops.addAll(tryBest.apply(backdropInfos).stream().map(url->staticController.jpgWrap(publishPrefix, url, Name)).collect(Collectors.toList()));
+        posters.addAll(tryBest.apply(posterInfos).stream().map(url->{ try { return imageDownloadService.download(url, Name); } catch(Throwable e) { throw new RuntimeException(e); } }).collect(Collectors.toList()));
+        backdrops.addAll(tryBest.apply(backdropInfos).stream().map(url->{ try { return imageDownloadService.download(url, Name); } catch(Throwable e) { throw new RuntimeException(e); } }).collect(Collectors.toList()));
     }
     
     @SneakyThrows
@@ -807,8 +815,8 @@ public class BaikeBaiduService implements SpiderService {
      */
     @SneakyThrows
     private synchronized Triple<Document, JsonNode, JsonNode> loadItemPage(String url, boolean needDataModuleValue) {
-        String pageDatatUrl = UriComponentsBuilder.fromUri(new URI(url)).queryParam("pageData", "1").build().toUriString();
-        String dataModuleValueUrl = UriComponentsBuilder.fromUri(new URI(url)).queryParam("dataModuleValue", "1").build().toUriString();
+        String pageDatatUrl = url + "?pageData=1";
+        String dataModuleValueUrl = url + "?dataModuleValue=1";
         
         String detailHtml = cacher.loadAsStr(url);
         String pageData = cacher.loadAsStr(pageDatatUrl);

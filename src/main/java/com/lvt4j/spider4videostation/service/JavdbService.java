@@ -21,13 +21,11 @@ import org.jsoup.select.Elements;
 import org.openqa.selenium.Cookie;
 import org.openqa.selenium.PageLoadStrategy;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import com.lvt4j.spider4videostation.Config;
-import com.lvt4j.spider4videostation.PluginType;
+import com.lvt4j.spider4videostation.TargetSite;
 import com.lvt4j.spider4videostation.Utils;
-import com.lvt4j.spider4videostation.controller.StaticController;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Movie;
 import com.lvt4j.spider4videostation.pojo.Rst;
@@ -47,17 +45,16 @@ public class JavdbService implements SpiderService {
 
     public static final String Name = "javdb";
     
-    private static final List<PluginType> SupportPluginTypes = Arrays.asList(PluginType.AV_Normal, PluginType.AV_StrictId);
+    private static final List<TargetSite> SupportTargetSites = Arrays.asList(TargetSite.AV_Normal, TargetSite.AV_StrictId);
     
     @Autowired
     private Config config;
     
     @Autowired
     private FileCacher cacher;
-    
-    @Autowired@Lazy
-    private StaticController staticController;
-    
+    @Autowired
+    private ImageDownloadService imageDownloadService;
+
     @Autowired
     private Drivers drivers;
     
@@ -87,16 +84,16 @@ public class JavdbService implements SpiderService {
     }
     
     @Override
-    public boolean support(PluginType plugin, Args args) {
-        if(!SupportPluginTypes.contains(plugin)) return false;
+    public boolean support(TargetSite plugin, Args args) {
+        if(!SupportTargetSites.contains(plugin)) return false;
         if(!plugin.searchTypes.contains(args.type)) return false;
         if(!plugin.languages.contains(args.lang)) return false;
         return true;
     }
     
     @Override
-    public void search(String pluginId, String publishPrefix, PluginType pluginType, Args args, Rst rst) {
-        boolean strictAvId = PluginType.AV_StrictId==pluginType;
+    public void search(TargetSite targetSite, Args args, Rst rst) {
+        boolean strictAvId = TargetSite.AV_StrictId==targetSite;
         
         String title = args.input.title;
         if(strictAvId) title = Utils.extractAvId(title);
@@ -140,7 +137,7 @@ public class JavdbService implements SpiderService {
             
             Movie movie = null;
             try{
-                movie = loadItem(pluginId, publishPrefix, pluginType, detailUrl);
+                movie = loadItem(targetSite, detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
                 continue;
@@ -152,14 +149,14 @@ public class JavdbService implements SpiderService {
             if(coverImg!=null){
                 coverUrl = coverImg.absUrl("src");
                 if(StringUtils.isNotBlank(coverUrl)){
-                    coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
+                    coverUrl = imageDownloadService.download(coverUrl, Name);
                 }
             }
             
             if(movie==null){ //未从详情页提取出信息
                 if(StringUtils.isNotBlank(videoTitle) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
                     //用列表上的数据
-                    movie = new Movie(pluginId);
+                    movie = new Movie(targetSite.name);
                     if(StringUtils.isNotBlank(videoTitle)) movie.title = videoTitle;
                     if(StringUtils.isNotBlank(coverUrl)) {
                         movie.extra().poster.add(0, coverUrl);
@@ -179,8 +176,8 @@ public class JavdbService implements SpiderService {
         }
     }
     
-    private Movie loadItem(String pluginId, String publishPrefix, PluginType plugin, String detailUrl) throws Exception {
-        Movie movie = new Movie(pluginId);
+    private Movie loadItem(TargetSite plugin, String detailUrl) throws Exception {
+        Movie movie = new Movie(plugin.name);
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);
@@ -200,7 +197,7 @@ public class JavdbService implements SpiderService {
         if(coverImg!=null) {
             coverUrl = coverImg.absUrl("src");
             if(StringUtils.isNotBlank(coverUrl)){
-                coverUrl = staticController.jpgWrap(publishPrefix, coverUrl, Name);
+                coverUrl = imageDownloadService.download(coverUrl, Name);
                 movie.extra().poster.add(coverUrl);
             }
         }
@@ -275,7 +272,7 @@ public class JavdbService implements SpiderService {
         for(Element previewA : previewAs){
             String previewUrl = previewA.absUrl("href");
             if(StringUtils.isBlank(previewUrl)) continue;
-            previewUrl = staticController.jpgWrap(publishPrefix, previewUrl, Name);
+            previewUrl = imageDownloadService.download(previewUrl, Name);
             movie.extra().backdrop.add(previewUrl);
         }
         if(previewAs.isEmpty()){ //无预览图时，用回大封面做背景图

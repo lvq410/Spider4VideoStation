@@ -92,10 +92,9 @@ dependencies {
     api 'commons-io:commons-io:2.5'
     api 'org.apache.commons:commons-collections4:4.3'
     
-    api 'org.springframework.boot:spring-boot-starter-web'
-    api 'org.springframework.boot:spring-boot-starter-actuator'
+    api 'org.springframework.boot:spring-boot-starter'
+    api 'org.springframework.boot:spring-boot-starter-json'
     api 'org.springframework.cloud:spring-cloud-context:2.1.1.RELEASE'
-    api 'de.codecentric:spring-boot-admin-starter-client:2.1.6'
     //api 'io.micrometer:micrometer-registry-prometheus'
     
     compile group: 'org.jsoup', name: 'jsoup', version: '1.13.1'
@@ -104,5 +103,6 @@ dependencies {
     //compile group: 'org.apache.httpcomponents', name: 'fluent-hc', version: '4.5.2'
     
     implementation 'org.seleniumhq.selenium:selenium-java:4.6.0'
+    implementation 'org.sejda.imageio:webp-imageio:0.1.6'
     //implementation 'io.github.bonigarcia:webdrivermanager:5.2.1'
 }
