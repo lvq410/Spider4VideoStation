@@ -1,17 +1,23 @@
 package com.lvt4j.spider4videostation.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
+import java.awt.Image;
 import java.awt.Insets;
+import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
+import javax.imageio.ImageIO;
 import javax.swing.DefaultListModel;
+import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JFrame;
@@ -31,6 +37,8 @@ import javax.swing.WindowConstants;
 import javax.swing.border.TitledBorder;
 
 import com.fasterxml.jackson.databind.JsonNode;
+
+import javax.swing.SwingUtilities;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
@@ -73,16 +81,22 @@ public class MainStage {
     private JTextField seasonTf;
     private JTextField episodeTf;
     private JTextField limitTf;
-    private JTextArea resultDetailTa;
+    private JPanel resultDetailPanel;
     private JTextArea resultRawTa;
     private DefaultListModel<String> resultTitleListModel;
     private JList<String> resultTitleList;
+    private Color resultListBg, resultDetailBg, resultRawBg;
     private List<Object> lastResults = new ArrayList<>();
     private JLabel statusLb;
     private JButton searchBtn;
     private JButton genVsmetaBtn;
     private JButton genNfoBtn;
     private JTextField targetPathTf;
+    private JButton pickerBtn;
+    private JButton cleanCacheBtn;
+    private JButton doubanLoginBtn;
+    private JButton metaViewerBtn;
+    private final List<JButton> settingButtons = new ArrayList<>();
 
     private JTextField webDriverAddrTf;
     private JTextField javdbOriginTf;
@@ -129,7 +143,7 @@ public class MainStage {
         pickerPanel.add(new JLabel("抓取目标:"), BorderLayout.WEST);
         targetPathTf = new JTextField();
         pickerPanel.add(targetPathTf, BorderLayout.CENTER);
-        JButton pickerBtn = new JButton("...");
+        pickerBtn = new JButton("...");
         pickerBtn.addActionListener(e -> openFilePicker());
         pickerPanel.add(pickerBtn, BorderLayout.EAST);
 
@@ -207,9 +221,8 @@ public class MainStage {
         JScrollPane titleScroll = new JScrollPane(resultTitleList);
         titleScroll.setPreferredSize(new Dimension(200, 0));
 
-        resultDetailTa = new JTextArea(20, 35);
-        resultDetailTa.setEditable(false);
-        JScrollPane detailScroll = new JScrollPane(resultDetailTa);
+        resultDetailPanel = new JPanel(new GridBagLayout());
+        JScrollPane detailScroll = new JScrollPane(resultDetailPanel);
 
         JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, titleScroll, detailScroll);
         splitPane.setResizeWeight(0.3);
@@ -218,6 +231,10 @@ public class MainStage {
         resultRawTa = new JTextArea(20, 45);
         resultRawTa.setEditable(false);
         JScrollPane rawScroll = new JScrollPane(resultRawTa);
+
+        resultListBg = resultTitleList.getBackground();
+        resultDetailBg = resultDetailPanel.getBackground();
+        resultRawBg = resultRawTa.getBackground();
 
         JTabbedPane resultTabs = new JTabbedPane();
         resultTabs.addTab("列表", splitPane);
@@ -269,13 +286,13 @@ public class MainStage {
 
         gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 3; gbc.weightx = 1.0; gbc.fill = GridBagConstraints.NONE; gbc.anchor = GridBagConstraints.WEST;
         JPanel btnPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 10, 0));
-        JButton cleanCacheBtn = new JButton("清空缓存");
+        cleanCacheBtn = new JButton("清空缓存");
         cleanCacheBtn.addActionListener(e -> cleanCache());
-        JButton doubanLoginBtn = new JButton("豆瓣登录");
+        doubanLoginBtn = new JButton("豆瓣登录");
         doubanLoginBtn.addActionListener(e -> openDoubanLogin());
         btnPanel.add(cleanCacheBtn);
         btnPanel.add(doubanLoginBtn);
-        JButton metaViewerBtn = new JButton("查看元数据文件");
+        metaViewerBtn = new JButton("查看元数据文件");
         metaViewerBtn.addActionListener(e -> openMetaViewer());
         btnPanel.add(metaViewerBtn);
         panel.add(btnPanel, gbc);
@@ -297,6 +314,7 @@ public class MainStage {
         gbc.weightx = 0; gbc.fill = GridBagConstraints.NONE;
         JButton btn = new JButton("设置");
         btn.addActionListener(e -> setProperty(label, tf));
+        settingButtons.add(btn);
         panel.add(btn, gbc);
         return row + 1;
     }
@@ -369,10 +387,17 @@ public class MainStage {
         }
 
         resultTitleListModel.clear();
-        resultDetailTa.setText("");
+        resultDetailPanel.removeAll();
+        resultDetailPanel.revalidate();
+        resultDetailPanel.repaint();
         resultRawTa.setText("搜索中...");
         statusLb.setText("搜索中...");
         searchBtn.setEnabled(false);
+        setInputControlsEnabled(false);
+        Color disabledBg = new Color(230, 230, 230);
+        resultTitleList.setBackground(disabledBg);
+        resultDetailPanel.setBackground(disabledBg);
+        resultRawTa.setBackground(disabledBg);
 
         new SwingWorker<Rst, Void>() {
             @Override
@@ -400,6 +425,12 @@ public class MainStage {
                     statusLb.setText("搜索失败");
                 } finally {
                     searchBtn.setEnabled(true);
+                    setInputControlsEnabled(true);
+                    onTypeSelect();
+                    updateApplyButtons();
+                    resultTitleList.setBackground(resultListBg);
+                    resultDetailPanel.setBackground(resultDetailBg);
+                    resultRawTa.setBackground(resultRawBg);
                 }
             }
         }.execute();
@@ -408,16 +439,70 @@ public class MainStage {
     private void onResultTitleSelect() {
         int idx = resultTitleList.getSelectedIndex();
         if (idx < 0 || idx >= lastResults.size()) {
-            resultDetailTa.setText("");
+            resultDetailPanel.removeAll();
+            resultDetailPanel.revalidate();
+            resultDetailPanel.repaint();
             updateApplyButtons();
             return;
         }
         try {
-            String json = Utils.ObjectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(lastResults.get(idx));
-            resultDetailTa.setText(json);
+            JsonNode node = Utils.ObjectMapper.valueToTree(lastResults.get(idx));
+            java.util.List<java.awt.Component> rows = new java.util.ArrayList<>();
+            addDetailRow(rows, "标题", text(node.get("title")));
+            addDetailRow(rows, "标语", text(node.get("tagline")));
+            String date = text(node.get("original_available"));
+            if (!date.isEmpty()) {
+                addDetailRow(rows, "发布日期", date);
+                if (date.length() >= 4) addDetailRow(rows, "年份", date.substring(0, 4));
+            }
+            addDetailRow(rows, "简介", text(node.get("summary")));
+            addDetailRow(rows, "分级", text(node.get("certificate")));
+            addDetailRow(rows, "类型", arr2str(node.get("genre")));
+            addDetailRow(rows, "演员", arr2str(node.get("actor")));
+            addDetailRow(rows, "导演", arr2str(node.get("director")));
+            addDetailRow(rows, "编剧", arr2str(node.get("writer")));
+            JsonNode seasonN = node.get("season");
+            if (seasonN != null && !seasonN.isNull()) addDetailRow(rows, "季", seasonN.asText());
+            JsonNode episodeN = node.get("episode");
+            if (episodeN != null && !episodeN.isNull()) addDetailRow(rows, "集", episodeN.asText());
+
+            JsonNode extra = node.get("extra");
+            if (extra != null) {
+                for (JsonNode siteNode : extra) {
+                    JsonNode rating = siteNode.get("rating");
+                    if (rating == null) continue;
+                    for (JsonNode val : rating) {
+                        if (val.isNumber()) {
+                            addDetailRow(rows, "评分", val.asText());
+                            break;
+                        }
+                    }
+                }
+                java.util.List<Image> posters = new java.util.ArrayList<>();
+                java.util.List<Image> backdrops = new java.util.ArrayList<>();
+                for (String path : collectExtraPaths(extra, "poster")) {
+                    Image img = loadImage(new File(path));
+                    if (img != null) posters.add(img);
+                }
+                for (String path : collectExtraPaths(extra, "backdrop")) {
+                    Image img = loadImage(new File(path));
+                    if (img != null) backdrops.add(img);
+                }
+                addDetailImageGroup(rows, "海报", posters);
+                addDetailImageGroup(rows, "背景", backdrops);
+            }
+
+            resultDetailPanel.removeAll();
+            GridBagConstraints c = new GridBagConstraints();
+            c.gridx = 0; c.gridy = 0; c.weightx = 1.0; c.weighty = 1.0;
+            c.anchor = GridBagConstraints.NORTHWEST; c.fill = GridBagConstraints.HORIZONTAL;
+            resultDetailPanel.add(assembleDetailPanel(rows), c);
         } catch (Exception e) {
-            resultDetailTa.setText("序列化失败: " + e.getMessage());
+            resultDetailPanel.removeAll();
+            resultDetailPanel.add(new JLabel("详情构建失败: " + e.getMessage()));
         }
+        resultDetailPanel.revalidate();
+        resultDetailPanel.repaint();
         updateApplyButtons();
     }
 
@@ -446,35 +531,26 @@ public class MainStage {
         }.execute();
     }
 
+    private File resolveInitialDir(String path) {
+        if (path.isEmpty()) return new File("E:\\Downloads");
+        File dir = new File(path);
+        if (dir.exists()) return dir.isDirectory() ? dir : dir.getParentFile();
+        while (dir != null && !dir.exists()) dir = dir.getParentFile();
+        return dir != null ? dir : new File("E:\\Downloads");
+    }
+
     private void openDoubanLogin() {
         DoubanLoginDialog dialog = new DoubanLoginDialog(frame);
         dialog.setVisible(true);
     }
 
     private void openMetaViewer() {
-        String current = targetPathTf.getText().trim();
-        File initialDir;
-        if (current.isEmpty()) {
-            initialDir = new File("E:\\Downloads");
-        } else {
-            initialDir = new File(current);
-        }
-        if (!initialDir.exists()) initialDir = new File("E:\\Downloads");
-
-        MetaViewerDialog dialog = new MetaViewerDialog(frame, initialDir);
+        MetaViewerDialog dialog = new MetaViewerDialog(frame, resolveInitialDir(targetPathTf.getText().trim()));
         dialog.setVisible(true);
     }
 
     private void openFilePicker() {
-        String current = targetPathTf.getText().trim();
-        File initialDir;
-        if (current.isEmpty()) {
-            initialDir = new File("E:\\Downloads");
-        } else {
-            initialDir = new File(current);
-        }
-        if (!initialDir.exists()) initialDir = new File("E:\\Downloads");
-
+        File initialDir = resolveInitialDir(targetPathTf.getText().trim());
         FilePickerDialog dialog = new FilePickerDialog(frame, initialDir);
         dialog.setVisible(true);
         FilePickerDialog.DialogResult result = dialog.getResult();
@@ -489,6 +565,153 @@ public class MainStage {
             && resultTitleList.getSelectedIndex() >= 0;
         genVsmetaBtn.setEnabled(enable);
         genNfoBtn.setEnabled(enable);
+    }
+
+    private void setInputControlsEnabled(boolean enabled) {
+        targetPathTf.setEnabled(enabled);
+        pickerBtn.setEnabled(enabled);
+        targetSiteCb.setEnabled(enabled);
+        typeCb.setEnabled(enabled);
+        langCb.setEnabled(enabled);
+        titleTf.setEnabled(enabled);
+        seasonTf.setEnabled(enabled);
+        episodeTf.setEnabled(enabled);
+        limitTf.setEnabled(enabled);
+        resultTitleList.setEnabled(enabled);
+        resultDetailPanel.setEnabled(enabled);
+        resultRawTa.setEnabled(enabled);
+        genVsmetaBtn.setEnabled(enabled);
+        genNfoBtn.setEnabled(enabled);
+        webDriverAddrTf.setEnabled(enabled);
+        javdbOriginTf.setEnabled(enabled);
+        fileEpOffsetTf.setEnabled(enabled);
+        siteEpOffsetTf.setEnabled(enabled);
+        originalAvailableTf.setEnabled(enabled);
+        doubanMaxLimitTf.setEnabled(enabled);
+        baikeBaiduMaxLimitTf.setEnabled(enabled);
+        cleanCacheBtn.setEnabled(enabled);
+        doubanLoginBtn.setEnabled(enabled);
+        for (JButton btn : settingButtons) btn.setEnabled(enabled);
+    }
+
+    // ==================== 搜索结果详情格式化展示 ====================
+
+    private static void addDetailRow(java.util.List<java.awt.Component> rows, String label, String value) {
+        if (value == null || value.isEmpty()) return;
+        rows.add(new JLabel(label + ":"));
+        JTextArea ta = new JTextArea(value);
+        ta.setEditable(false);
+        ta.setLineWrap(true);
+        ta.setWrapStyleWord(true);
+        ta.setBackground(null);
+        ta.setFont(new JLabel().getFont());
+        rows.add(ta);
+    }
+
+    private static void addDetailImageRow(java.util.List<java.awt.Component> rows, String label, Image img) {
+        if (img == null) return;
+        rows.add(new JLabel(label + ":"));
+        rows.add(new JLabel(new ImageIcon(img)));
+    }
+
+    private static void addDetailImageGroup(java.util.List<java.awt.Component> rows, String label, java.util.List<Image> imgs) {
+        if (imgs.isEmpty()) return;
+        rows.add(new JLabel(label + ":"));
+        JPanel flow = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 0) {
+            @Override
+            public void layoutContainer(java.awt.Container target) {
+                super.layoutContainer(target);
+                synchronized (target.getTreeLock()) {
+                    for (int i = 0, n = target.getComponentCount(); i < n; i++) {
+                        java.awt.Component c = target.getComponent(i);
+                        c.setLocation(c.getX(), 0);
+                    }
+                }
+            }
+        });
+        for (Image img : imgs) flow.add(new JLabel(new ImageIcon(img)));
+        rows.add(flow);
+    }
+
+    private static JPanel assembleDetailPanel(java.util.List<java.awt.Component> rows) {
+        JPanel panel = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(3, 5, 3, 5);
+        gbc.anchor = GridBagConstraints.NORTHWEST;
+        int row = 0;
+        for (int i = 0; i < rows.size(); i += 2) {
+            JLabel labelComp = (JLabel) rows.get(i);
+            java.awt.Component valComp = rows.get(i + 1);
+            boolean isImage = valComp instanceof JLabel && ((JLabel) valComp).getIcon() != null;
+
+            gbc.gridy = row;
+            gbc.gridx = 0;
+            gbc.weightx = 0;
+            gbc.fill = GridBagConstraints.NONE;
+            panel.add(labelComp, gbc);
+            gbc.gridx = 1;
+            if (isImage) {
+                gbc.weightx = 0;
+                gbc.fill = GridBagConstraints.NONE;
+            } else {
+                gbc.weightx = 1.0;
+                gbc.fill = GridBagConstraints.HORIZONTAL;
+            }
+            panel.add(valComp, gbc);
+            row++;
+        }
+        gbc.gridy = row;
+        gbc.gridx = 0;
+        gbc.weightx = 1.0;
+        gbc.weighty = 1.0;
+        gbc.fill = GridBagConstraints.BOTH;
+        panel.add(new JLabel(), gbc);
+        return panel;
+    }
+
+    private static String text(JsonNode node) {
+        return node == null || node.isNull() ? "" : node.asText();
+    }
+
+    private static String arr2str(JsonNode arr) {
+        if (arr == null || !arr.isArray()) return null;
+        java.util.List<String> items = new java.util.ArrayList<>();
+        for (JsonNode item : arr) items.add(item.asText());
+        return items.isEmpty() ? null : String.join(", ", items);
+    }
+
+    private static java.util.List<String> collectExtraPaths(JsonNode extra, String field) {
+        java.util.List<String> paths = new java.util.ArrayList<>();
+        collectArr(extra, field, paths);
+        for (JsonNode siteNode : extra) {
+            JsonNode tvshow = siteNode.get("tvshow");
+            if (tvshow == null) continue;
+            JsonNode tvExtra = tvshow.get("extra");
+            if (tvExtra != null) collectArr(tvExtra, field, paths);
+        }
+        return paths;
+    }
+    private static void collectArr(JsonNode container, String field, java.util.List<String> paths) {
+        if (container == null) return;
+        for (JsonNode siteNode : container) {
+            JsonNode arr = siteNode.get(field);
+            if (arr != null && arr.isArray()) for (JsonNode item : arr) paths.add(item.asText());
+        }
+    }
+
+    private static Image loadImage(File file) {
+        try {
+            if (!file.exists()) return null;
+            BufferedImage img = ImageIO.read(file);
+            if (img == null) return null;
+            if (img.getWidth() > 200) {
+                int h = img.getHeight() * 200 / img.getWidth();
+                return img.getScaledInstance(200, h, Image.SCALE_SMOOTH);
+            }
+            return img;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     private void generateMetadata(boolean vsmeta) {
@@ -517,11 +740,12 @@ public class MainStage {
                     String lang = (String) langCb.getSelectedItem();
                     TargetSite ts = findTargetSite();
                     if (ts == null) return "抓取目标网站未选择";
-                    int count = metadataGenerator.generateBatch(target, showTitle, ts, lang, vsmeta, !vsmeta);
+                    int count = metadataGenerator.generateBatch(target, showTitle, ts, lang, vsmeta, !vsmeta,
+                        msg -> SwingUtilities.invokeLater(() -> statusLb.setText(msg)));
                     return "批量生成完成，共 " + count + " 个";
                 }
                 Object result = lastResults.get(selectedIdx);
-                if (vsmeta) metadataGenerator.generateVsmeta(target, result);
+                if (vsmeta) metadataGenerator.generateVsmeta(target, result, null);
                 else metadataGenerator.generateNfo(target, result);
                 return vsmeta ? "vsmeta生成完成" : "nfo生成完成";
             }

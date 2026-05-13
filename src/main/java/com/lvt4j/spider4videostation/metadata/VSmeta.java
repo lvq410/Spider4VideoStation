@@ -184,7 +184,9 @@ public class VSmeta{
     public Integer timestamp;
 
     public VSmeta(File vsmetaFile) throws Exception {
-        parse(new FileInputStream(vsmetaFile));
+        try (FileInputStream fis = new FileInputStream(vsmetaFile)) {
+            parse(fis);
+        }
     }
 
     public void parse(InputStream is) throws Exception {
@@ -339,8 +341,8 @@ public class VSmeta{
     }
     private void writeMovie(OutputStream out) throws Exception {
         out.write(ShowTitle); writeString(out, showTitle);
-        out.write(ShowTitle2); writeString(out, showTitle2);
-        out.write(EpisodeTitle); writeString(out, episodeTitle);
+        if(showTitle2!=null) {out.write(ShowTitle2); writeString(out, showTitle2);}
+        if(episodeTitle!=null) {out.write(EpisodeTitle); writeString(out, episodeTitle);}
         out.write(Year); writeInt(out, year);
         if(episodeReleaseDate!=null) {out.write(EpisodeReleaseDate); writeString(out, episodeReleaseDate);}
         if(episodeLocked!=null) {out.write(EpisodeLocked); out.write(episodeLocked);}
@@ -388,8 +390,8 @@ public class VSmeta{
     }
     private void writeEpisode(OutputStream out) throws Exception {
         out.write(ShowTitle); writeString(out, showTitle);
-        out.write(ShowTitle2); writeString(out, showTitle2);
-        out.write(EpisodeTitle); writeString(out, episodeTitle);
+        if(showTitle2!=null) {out.write(ShowTitle2); writeString(out, showTitle2);}
+        if(episodeTitle!=null) {out.write(EpisodeTitle); writeString(out, episodeTitle);}
         out.write(Year); writeInt(out, year);
         if(episodeReleaseDate!=null) {out.write(EpisodeReleaseDate); writeString(out, episodeReleaseDate);}
         if(episodeLocked!=null) {out.write(EpisodeLocked); out.write(episodeLocked);}

@@ -853,12 +853,21 @@ public class DoubanService implements SpiderService {
     private synchronized String loadPage(String url) {
         String cached = cacher.loadAsStr(url);
         if(cached!=null) return cached;
-        
-        
+
         return driver.open(url, (driver, src)->{
             if(!isLogined(src)){
                 log.error("未登录，需先登录！");
                 throw new RuntimeException("未登录");
+            }
+            // 豆瓣搜索结果通过JS异步渲染，需等待结果出现
+            if(url.contains("/subject_search")){
+                try {
+                    boolean hasResult = Utils.waitUntil(()->{
+                        String ps = driver.getPageSource();
+                        return ps.contains("item-root") || ps.contains("result-list") || ps.contains("search-result");
+                    }, config.getDoubanSearchWaitTimeoutMillis());
+                    if(hasResult) src = driver.getPageSource();
+                } catch (Exception ignored) {}
             }
             if(url.equals(driver.getCurrentUrl())) cacher.saveAsStr(url, src);
             return src;

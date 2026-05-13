@@ -51,6 +51,7 @@ public class Config {
     private String doubanMovieOrigin;
     private String doubanMovieItemPattern;
     private long doubanLoginWaitTimeoutMillis;
+    private long doubanSearchWaitTimeoutMillis;
     private List<String> doubanLoginCheckableDomain;
     private String doubanLoginCheckUrl;
     private String doubanLoginUrl;

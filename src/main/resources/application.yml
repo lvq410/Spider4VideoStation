@@ -57,6 +57,7 @@ doubanMovieDomain: movie.${doubanDomain}
 doubanMovieOrigin: https://${doubanMovieDomain}
 doubanMovieItemPattern: https://${doubanMovieDomain}/subject
 doubanLoginWaitTimeoutMillis: 60000
+doubanSearchWaitTimeoutMillis: 5000
 doubanLoginCheckableDomain:
 - ${doubanSearchDomain}
 - ${doubanMovieDomain}

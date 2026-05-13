@@ -2,6 +2,7 @@ package com.lvt4j.spider4videostation.metadata;
 
 import java.io.File;
 import java.util.List;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -11,6 +12,8 @@ import org.springframework.stereotype.Service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.lvt4j.spider4videostation.TargetSite;
 import com.lvt4j.spider4videostation.Utils;
+import com.lvt4j.spider4videostation.ffmpeg.FFmpegUtils;
+import com.lvt4j.spider4videostation.ffmpeg.MediaInfo;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Rst;
 import com.lvt4j.spider4videostation.service.SearchOrchestratorService;
@@ -32,7 +35,7 @@ public class MetadataGenerator {
     private SearchOrchestratorService searchOrchestrator;
 
     /** 单文件模式：为指定文件生成 vsmeta */
-    public void generateVsmeta(File target, Object result) throws Exception {
+    public void generateVsmeta(File target, Object result, Consumer<String> onProgress) throws Exception {
         JsonNode node = Utils.ObjectMapper.valueToTree(result);
         VSmeta vsmeta = new VSmeta();
         boolean isEpisode = node.has("season") && !node.get("season").isNull();
@@ -56,13 +59,29 @@ public class MetadataGenerator {
         vsmeta.classification = text(node.get("certificate"));
 
         JsonNode extra = node.get("extra");
+        String posterData = null, posterMd5 = null;
         if (extra != null) {
+            // 评分
+            outer:
+            for (JsonNode siteNode : extra) {
+                JsonNode rating = siteNode.get("rating");
+                if (rating == null) continue;
+                for (JsonNode val : rating) {
+                    if (val.isNumber()) {
+                        int r = (int) Math.round(val.asDouble());
+                        vsmeta.rating = new byte[]{(byte) r};
+                        break outer;
+                    }
+                }
+            }
             String poster = findInExtraDeep(extra, "poster");
             if (poster != null) {
                 File imgFile = new File(poster);
                 if (imgFile.exists()) {
-                    vsmeta.episodeThumbData = VSmeta.readImgData(imgFile);
-                    vsmeta.episodeThumbMd5 = md5(imgFile);
+                    posterData = VSmeta.readImgData(imgFile);
+                    posterMd5 = md5(imgFile);
+                    vsmeta.episodeThumbData = posterData;
+                    vsmeta.episodeThumbMd5 = posterMd5;
                 }
             }
             String backdrop = findInExtraDeep(extra, "backdrop");
@@ -82,9 +101,34 @@ public class MetadataGenerator {
             vsmeta.releaseDateTvShow = vsmeta.episodeReleaseDate;
             vsmeta.locked = 1;
             vsmeta.tvshowSummary = text(node.get("summary"));
-            if (vsmeta.episodeThumbData != null) {
-                vsmeta.posterData = vsmeta.episodeThumbData;
-                vsmeta.posterMd5 = vsmeta.episodeThumbMd5;
+
+            // 尝试从视频截图作为剧集缩略图
+            if (target.isFile()) {
+                try {
+                    if (onProgress != null)
+                        onProgress.accept(String.format("正在探测视频信息 S%02dE%02d...", vsmeta.season, vsmeta.episode));
+                    MediaInfo mediaInfo = FFmpegUtils.mediaInfo(target);
+                    long position = (long)(mediaInfo.format.parseDuration() * 0.618);
+                    String name = target.getName();
+                    int dot = name.lastIndexOf('.');
+                    String baseName = dot > 0 ? name.substring(0, dot) : name;
+                    File snapshot = new File(target.getParentFile(), baseName + ".thumb.tmp.jpg");
+                    if (onProgress != null)
+                        onProgress.accept(String.format("正在截取视频画面 S%02dE%02d...", vsmeta.season, vsmeta.episode));
+                    FFmpegUtils.snapshot(target, FFmpegUtils.formatDuration(position), snapshot);
+                    if (snapshot.exists() && snapshot.length() > 0) {
+                        vsmeta.episodeThumbData = VSmeta.readImgData(snapshot);
+                        vsmeta.episodeThumbMd5 = md5(snapshot);
+                        snapshot.delete();
+                    }
+                } catch (Exception e) {
+                    log.warn("视频截图失败，使用海报作为缩略图: {}", target.getAbsolutePath(), e);
+                }
+            }
+
+            if (posterData != null) {
+                vsmeta.posterData = posterData;
+                vsmeta.posterMd5 = posterMd5;
             }
         }
         vsmeta.timestamp = (int)(System.currentTimeMillis() / 1000);
@@ -116,10 +160,12 @@ public class MetadataGenerator {
     }
 
     /** 批量剧集模式：遍历文件夹中视频文件，逐一搜索并生成元数据 */
-    public int generateBatch(File folder, String showTitle, TargetSite ts, String lang, boolean vsmeta, boolean nfo) throws Exception {
+    public int generateBatch(File folder, String showTitle, TargetSite ts, String lang,
+            boolean vsmeta, boolean nfo, Consumer<String> onProgress) throws Exception {
         File[] videoFiles = FUtils.listVideoFiles(folder);
-        int count = 0;
-        for (File vf : videoFiles) {
+        int total = videoFiles.length, count = 0;
+        for (int i = 0; i < total; i++) {
+            File vf = videoFiles[i];
             String name = vf.getName();
             Matcher m = EpPattern.matcher(name);
             if (!m.find()) {
@@ -128,6 +174,9 @@ public class MetadataGenerator {
             }
             int season = Integer.parseInt(m.group(2));
             int episode = Integer.parseInt(m.group(3));
+
+            if (onProgress != null)
+                onProgress.accept(String.format("正在搜索 S%02dE%02d (%d/%d)...", season, episode, i + 1, total));
 
             Args.Input input = new Args.Input();
             input.title = showTitle;
@@ -144,8 +193,12 @@ public class MetadataGenerator {
                 log.warn("no result for S{:02d}E{:02d} {}", season, episode, name);
                 continue;
             }
+
+            if (onProgress != null)
+                onProgress.accept(String.format("正在生成 S%02dE%02d (%d/%d)...", season, episode, i + 1, total));
+
             Object result = results.get(0);
-            if (vsmeta) generateVsmeta(vf, result);
+            if (vsmeta) generateVsmeta(vf, result, onProgress);
             if (nfo) generateNfo(vf, result);
             count++;
         }

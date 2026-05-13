@@ -69,7 +69,7 @@ public class FilePickerDialog extends JDialog {
         navBtnPanel.add(backBtn);
         navBtnPanel.add(forwardBtn);
         pathTf = new JTextField(currentDir.getAbsolutePath());
-        JButton goBtn = new JButton("确认");
+        JButton goBtn = new JButton("\u25B6");
         goBtn.addActionListener(e -> navigateTo(pathTf.getText().trim()));
         pathTf.addActionListener(e -> navigateTo(pathTf.getText().trim()));
         navPanel.add(navBtnPanel, BorderLayout.WEST);
