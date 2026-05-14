@@ -48,6 +48,10 @@ class StaticServiceByXhrSync implements StaticService {
         return drivers.driver(service, Type.Staticer).open(touchUrl, driver->{
             log.trace("send down xhr script");
             String b64 = (String) driver.executeScript(script);
+            if (b64 == null || b64.isEmpty()) {
+                log.warn("down static failed: {}", url);
+                return null;
+            }
             log.trace("downed b64 length : {}", b64.length());
             return Base64.getDecoder().decode(b64);
         });

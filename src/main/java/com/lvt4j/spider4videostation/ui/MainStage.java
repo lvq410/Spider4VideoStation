@@ -4,6 +4,7 @@ import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
@@ -43,6 +44,7 @@ import javax.swing.SwingUtilities;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import com.lvt4j.spider4videostation.Spider4VideoStationApp;
 import com.lvt4j.spider4videostation.TargetSite;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.pojo.Args;
@@ -91,6 +93,7 @@ public class MainStage {
     private JButton searchBtn;
     private JButton genVsmetaBtn;
     private JButton genNfoBtn;
+    private JButton renameBtn;
     private JTextField targetPathTf;
     private JButton pickerBtn;
     private JButton cleanCacheBtn;
@@ -131,6 +134,10 @@ public class MainStage {
 
         frame.setSize(1150, 750);
         frame.setLocationRelativeTo(null);
+
+        // 给显示刮削/文件数据的控件应用 CJK 字体（韩文兼容），UI 标签按钮保持默认
+        applyCJKFontToContent();
+
         frame.setVisible(true);
 
         loadSettings();
@@ -251,6 +258,10 @@ public class MainStage {
         applyPanel.setBorder(new TitledBorder("应用"));
         applyPanel.add(genVsmetaBtn);
         applyPanel.add(genNfoBtn);
+        renameBtn = new JButton("标准重命名");
+        renameBtn.setEnabled(false);
+        renameBtn.addActionListener(e -> renameStandard());
+        applyPanel.add(renameBtn);
 
         JPanel resultPanel = new JPanel(new BorderLayout());
         resultPanel.add(resultTabs, BorderLayout.CENTER);
@@ -565,6 +576,8 @@ public class MainStage {
             && resultTitleList.getSelectedIndex() >= 0;
         genVsmetaBtn.setEnabled(enable);
         genNfoBtn.setEnabled(enable);
+        boolean isMovie = "movie".equals(typeCb.getSelectedItem());
+        renameBtn.setEnabled(enable && isMovie);
     }
 
     private void setInputControlsEnabled(boolean enabled) {
@@ -583,6 +596,7 @@ public class MainStage {
         resultRawTa.setEnabled(enabled);
         genVsmetaBtn.setEnabled(enabled);
         genNfoBtn.setEnabled(enabled);
+        renameBtn.setEnabled(enabled);
         webDriverAddrTf.setEnabled(enabled);
         javdbOriginTf.setEnabled(enabled);
         fileEpOffsetTf.setEnabled(enabled);
@@ -597,6 +611,21 @@ public class MainStage {
 
     // ==================== 搜索结果详情格式化展示 ====================
 
+    private static Font getContentFont() {
+        Font cjk = Spider4VideoStationApp.getCJKFont();
+        if (cjk == null) return null;
+        return cjk.deriveFont((float) new JLabel().getFont().getSize());
+    }
+
+    private void applyCJKFontToContent() {
+        Font f = getContentFont();
+        if (f == null) return;
+        resultTitleList.setFont(f);
+        resultRawTa.setFont(f);
+        targetPathTf.setFont(f);
+        titleTf.setFont(f);
+    }
+
     private static void addDetailRow(java.util.List<java.awt.Component> rows, String label, String value) {
         if (value == null || value.isEmpty()) return;
         rows.add(new JLabel(label + ":"));
@@ -605,7 +634,8 @@ public class MainStage {
         ta.setLineWrap(true);
         ta.setWrapStyleWord(true);
         ta.setBackground(null);
-        ta.setFont(new JLabel().getFont());
+        Font cjk = Spider4VideoStationApp.getCJKFont();
+        ta.setFont(cjk != null ? cjk.deriveFont((float)new JLabel().getFont().getSize()) : ta.getFont());
         rows.add(ta);
     }
 
@@ -830,5 +860,65 @@ public class MainStage {
         int dot = name.lastIndexOf('.');
         if (dot > 0) return name.substring(0, dot);
         return name;
+    }
+
+    // ==================== 标准重命名 ====================
+
+    private static String legalName(String name) {
+        return name.replaceAll("[\t]", " ").replaceAll("[/]", "／")
+            .replaceAll("[\\\\]", "＼").replaceAll("[:꞉]", "：")
+            .replaceAll("[\\*]", "＊").replaceAll("[\\?]", "？")
+            .replaceAll("[\\\"]", "＂").replaceAll("[<]", "＜")
+            .replaceAll("[>]", "＞").replaceAll("[|]", "｜")
+            .replaceAll("[!]", "！").replaceAll("[・]", "·")
+            .replaceAll("[･]", "·").replaceAll("[｢]", "「")
+            .replaceAll("[｣]", "」").replaceAll("[♪]", "")
+            .replaceAll("[〜]", "～").replaceAll("[♭]", "b");
+    }
+
+    private void renameStandard() {
+        int selectedIdx = resultTitleList.getSelectedIndex();
+        if (selectedIdx < 0 || selectedIdx >= lastResults.size()) return;
+        String targetPath = targetPathTf.getText().trim();
+        File target = new File(targetPath);
+        if (!target.isFile()) {
+            statusLb.setText("请选择视频文件");
+            return;
+        }
+
+        JsonNode node = Utils.ObjectMapper.valueToTree(lastResults.get(selectedIdx));
+        String title = node.get("title").asText();
+        String date = node.has("original_available") ? node.get("original_available").asText() : "";
+        String year = date.length() >= 4 ? date.substring(0, 4) : "";
+
+        String ext = target.getName().substring(target.getName().lastIndexOf('.'));
+        String newName = legalName(title);
+        if (!year.isEmpty()) newName += " (" + year + ")";
+        newName += ext;
+        File newFile = new File(target.getParentFile(), newName);
+
+        if (newFile.exists() && !newFile.equals(target)) {
+            statusLb.setText("目标文件已存在: " + newName);
+            return;
+        }
+
+        // 重命名对应的vsmeta文件
+        File oldVsmeta = new File(target.getParentFile(), target.getName() + ".vsmeta");
+        File newVsmeta = new File(target.getParentFile(), newFile.getName() + ".vsmeta");
+        if (oldVsmeta.exists()) {
+            if (newVsmeta.exists() && !newVsmeta.equals(oldVsmeta)) {
+                statusLb.setText("目标vsmeta文件已存在: " + newVsmeta.getName());
+                return;
+            }
+            if (!oldVsmeta.renameTo(newVsmeta))
+                System.err.println("vsmeta重命名失败: " + oldVsmeta.getAbsolutePath());
+        }
+
+        if (target.renameTo(newFile)) {
+            targetPathTf.setText(newFile.getAbsolutePath());
+            statusLb.setText("已重命名为 " + newFile.getName());
+        } else {
+            statusLb.setText("重命名失败");
+        }
     }
 }

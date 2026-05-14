@@ -3,12 +3,14 @@ package com.lvt4j.spider4videostation.ui;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.Frame;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.util.Stack;
 
+import com.lvt4j.spider4videostation.Spider4VideoStationApp;
 import com.lvt4j.spider4videostation.metadata.FUtils;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
@@ -79,6 +81,8 @@ public class FilePickerDialog extends JDialog {
         // 文件列表 — JList<String>，仿 ResourceSpider 风格
         listModel = new DefaultListModel<>();
         fileList = new JList<>(listModel);
+        Font cjkFont = Spider4VideoStationApp.getCJKFont();
+        if (cjkFont != null) fileList.setFont(cjkFont.deriveFont((float)fileList.getFont().getSize()));
         fileList.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {

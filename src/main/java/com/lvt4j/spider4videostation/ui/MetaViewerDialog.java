@@ -3,6 +3,7 @@ package com.lvt4j.spider4videostation.ui;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.Frame;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
@@ -34,6 +35,8 @@ import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.WindowConstants;
 import javax.swing.border.EmptyBorder;
+
+import com.lvt4j.spider4videostation.Spider4VideoStationApp;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -105,6 +108,11 @@ public class MetaViewerDialog extends JDialog {
         // 左侧文件列表 — .vsmeta + .nfo + 文件夹
         listModel = new DefaultListModel<>();
         fileList = new JList<>(listModel);
+        Font cjkFont = Spider4VideoStationApp.getCJKFont();
+        if (cjkFont != null) {
+            fileList.setFont(cjkFont.deriveFont((float) fileList.getFont().getSize()));
+            pathTf.setFont(cjkFont.deriveFont((float) pathTf.getFont().getSize()));
+        }
         fileList.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -383,7 +391,8 @@ public class MetaViewerDialog extends JDialog {
         ta.setEditable(true);
         ta.setLineWrap(true);
         ta.setWrapStyleWord(true);
-        ta.setFont(new JLabel().getFont());
+        Font cjk = Spider4VideoStationApp.getCJKFont();
+        ta.setFont(cjk != null ? cjk.deriveFont((float)new JLabel().getFont().getSize()) : ta.getFont());
         fieldComponents.put(fieldKey, ta);
         rows.add(ta);
     }

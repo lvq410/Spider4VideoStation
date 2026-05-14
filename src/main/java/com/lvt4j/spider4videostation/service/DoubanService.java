@@ -301,6 +301,7 @@ public class DoubanService implements SpiderService {
             default: break;
             }
         }
+        if(StringUtils.isNotBlank(config.getOriginalAvailable())) movie.original_available = config.getOriginalAvailable();
         Element ratingStrong = contentDiv.selectFirst("strong[property='v:average']");
         if(ratingStrong!=null){
             String rating = ratingStrong.text().trim();
@@ -793,7 +794,9 @@ public class DoubanService implements SpiderService {
         }
         
         if(StringUtils.isBlank(episode.summary)) episode.summary = base.summary;
-        
+
+        if(StringUtils.isNotBlank(config.getOriginalAvailable())) episode.original_available = config.getOriginalAvailable();
+
         return episode;
     }
     
@@ -879,6 +882,7 @@ public class DoubanService implements SpiderService {
         if(cached!=null) return cached;
         
         byte[] bs = staticService.down(url, Name);
+        if (bs == null) throw new RuntimeException("下载失败: " + url);
         cacher.save(url, bs);
         return new String(bs);
     }

@@ -68,7 +68,7 @@ public class MetadataGenerator {
                 if (rating == null) continue;
                 for (JsonNode val : rating) {
                     if (val.isNumber()) {
-                        int r = (int) Math.round(val.asDouble());
+                        int r = (int) Math.round(val.asDouble() * 10);
                         vsmeta.rating = new byte[]{(byte) r};
                         break outer;
                     }
