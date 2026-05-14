@@ -35,7 +35,7 @@ public class MetadataGenerator {
     private SearchOrchestratorService searchOrchestrator;
 
     /** 单文件模式：为指定文件生成 vsmeta */
-    public void generateVsmeta(File target, Object result, Consumer<String> onProgress) throws Exception {
+    public void generateVsmeta(File target, Object result, Consumer<String> onProgress, int index, int total) throws Exception {
         JsonNode node = Utils.ObjectMapper.valueToTree(result);
         VSmeta vsmeta = new VSmeta();
         boolean isEpisode = node.has("season") && !node.get("season").isNull();
@@ -106,7 +106,7 @@ public class MetadataGenerator {
             if (target.isFile()) {
                 try {
                     if (onProgress != null)
-                        onProgress.accept(String.format("正在探测视频信息 S%02dE%02d...", vsmeta.season, vsmeta.episode));
+                        onProgress.accept(String.format("正在探测视频信息 S%02dE%02d (%d/%d)...", vsmeta.season, vsmeta.episode, index, total));
                     MediaInfo mediaInfo = FFmpegUtils.mediaInfo(target);
                     long position = (long)(mediaInfo.format.parseDuration() * 0.618);
                     String name = target.getName();
@@ -114,7 +114,7 @@ public class MetadataGenerator {
                     String baseName = dot > 0 ? name.substring(0, dot) : name;
                     File snapshot = new File(target.getParentFile(), baseName + ".thumb.tmp.jpg");
                     if (onProgress != null)
-                        onProgress.accept(String.format("正在截取视频画面 S%02dE%02d...", vsmeta.season, vsmeta.episode));
+                        onProgress.accept(String.format("正在截取视频画面 S%02dE%02d (%d/%d)...", vsmeta.season, vsmeta.episode, index, total));
                     FFmpegUtils.snapshot(target, FFmpegUtils.formatDuration(position), snapshot);
                     if (snapshot.exists() && snapshot.length() > 0) {
                         vsmeta.episodeThumbData = VSmeta.readImgData(snapshot);
@@ -198,7 +198,7 @@ public class MetadataGenerator {
                 onProgress.accept(String.format("正在生成 S%02dE%02d (%d/%d)...", season, episode, i + 1, total));
 
             Object result = results.get(0);
-            if (vsmeta) generateVsmeta(vf, result, onProgress);
+            if (vsmeta) generateVsmeta(vf, result, onProgress, i + 1, total);
             if (nfo) generateNfo(vf, result);
             count++;
         }

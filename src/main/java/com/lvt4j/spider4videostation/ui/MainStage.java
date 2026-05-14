@@ -568,6 +568,7 @@ public class MainStage {
     }
 
     private void setInputControlsEnabled(boolean enabled) {
+        searchBtn.setEnabled(enabled);
         targetPathTf.setEnabled(enabled);
         pickerBtn.setEnabled(enabled);
         targetSiteCb.setEnabled(enabled);
@@ -721,8 +722,7 @@ public class MainStage {
         if (selectedIdx < 0 || selectedIdx >= lastResults.size()) return;
 
         String type = (String) typeCb.getSelectedItem();
-        genVsmetaBtn.setEnabled(false);
-        genNfoBtn.setEnabled(false);
+        setInputControlsEnabled(false);
         statusLb.setText(vsmeta ? "生成vsmeta中..." : "生成nfo中...");
 
         new SwingWorker<String, Void>() {
@@ -745,7 +745,7 @@ public class MainStage {
                     return "批量生成完成，共 " + count + " 个";
                 }
                 Object result = lastResults.get(selectedIdx);
-                if (vsmeta) metadataGenerator.generateVsmeta(target, result, null);
+                if (vsmeta) metadataGenerator.generateVsmeta(target, result, null, 0, 0);
                 else metadataGenerator.generateNfo(target, result);
                 return vsmeta ? "vsmeta生成完成" : "nfo生成完成";
             }
@@ -755,9 +755,13 @@ public class MainStage {
                 try {
                     String msg = get();
                     statusLb.setText(msg);
+                    if (msg.startsWith("批量生成完成"))
+                        JOptionPane.showMessageDialog(frame, msg, "提示", JOptionPane.INFORMATION_MESSAGE);
                 } catch (Exception e) {
                     statusLb.setText("生成失败: " + e.getMessage());
                 } finally {
+                    setInputControlsEnabled(true);
+                    onTypeSelect();
                     updateApplyButtons();
                 }
             }

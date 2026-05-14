@@ -58,7 +58,7 @@ public class FFmpegUtils {
     }
 
     public static void snapshot(File video, String position, File snapshot) throws Exception {
-        String cmd = FFmpegExe + " -hide_banner -y -i \"" + video.getAbsolutePath() + "\" -ss " + position + " -vframes 1 \"" + snapshot.getAbsolutePath() + "\"";
+        String cmd = FFmpegExe + " -hide_banner -y -ss " + position + " -i \"" + video.getAbsolutePath() + "\" -vframes 1 \"" + snapshot.getAbsolutePath() + "\"";
         exec(cmd, null, null);
     }
 
