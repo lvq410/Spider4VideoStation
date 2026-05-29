@@ -52,8 +52,13 @@ public class ConfigService {
             StringBuilder sb = new StringBuilder("# Spider4VideoStation local settings\n");
             for (String key : MainStage.SETTING_KEYS) {
                 String val = System.getProperty(key);
+                if (val == null) val = env.getProperty(key);
                 if (val != null) sb.append(key).append(": ").append(val).append('\n');
             }
+            // 最近抓取目标
+            String recentTargets = System.getProperty("recentTargets");
+            if (recentTargets == null) recentTargets = env.getProperty("recentTargets");
+            if (recentTargets != null) sb.append("recentTargets: '").append(recentTargets.replace("'", "''")).append("'\n");
             try (OutputStreamWriter w = new OutputStreamWriter(
                     new FileOutputStream(LocalConfigFile), StandardCharsets.UTF_8)) {
                 w.write(sb.toString());

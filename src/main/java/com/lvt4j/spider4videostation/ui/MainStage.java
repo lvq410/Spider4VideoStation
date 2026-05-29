@@ -13,6 +13,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +22,7 @@ import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
+import javax.swing.JDialog;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
@@ -35,21 +37,32 @@ import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
 import javax.swing.WindowConstants;
+import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import javax.swing.SwingUtilities;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+
 import com.lvt4j.spider4videostation.Spider4VideoStationApp;
 import com.lvt4j.spider4videostation.TargetSite;
 import com.lvt4j.spider4videostation.Utils;
 import com.lvt4j.spider4videostation.pojo.Args;
 import com.lvt4j.spider4videostation.pojo.Rst;
+import com.lvt4j.spider4videostation.ffmpeg.FFmpegUtils;
+import com.lvt4j.spider4videostation.ffmpeg.MediaInfo;
 import com.lvt4j.spider4videostation.metadata.MetadataGenerator;
+import com.lvt4j.spider4videostation.metadata.NfoGenerator;
+import com.lvt4j.spider4videostation.metadata.VSmeta;
 import com.lvt4j.spider4videostation.service.ConfigService;
 import com.lvt4j.spider4videostation.service.FileCacher;
 import com.lvt4j.spider4videostation.service.SearchOrchestratorService;
@@ -94,7 +107,8 @@ public class MainStage {
     private JButton genVsmetaBtn;
     private JButton genNfoBtn;
     private JButton renameBtn;
-    private JTextField targetPathTf;
+    private JComboBox<String> targetPathCb;
+    private javax.swing.DefaultComboBoxModel<String> targetPathModel;
     private JButton pickerBtn;
     private JButton cleanCacheBtn;
     private JButton doubanLoginBtn;
@@ -141,6 +155,7 @@ public class MainStage {
         frame.setVisible(true);
 
         loadSettings();
+        loadRecentTargets();
     }
 
     private JPanel buildLeftPanel() {
@@ -148,8 +163,10 @@ public class MainStage {
 
         JPanel pickerPanel = new JPanel(new BorderLayout(5, 0));
         pickerPanel.add(new JLabel("抓取目标:"), BorderLayout.WEST);
-        targetPathTf = new JTextField();
-        pickerPanel.add(targetPathTf, BorderLayout.CENTER);
+        targetPathModel = new javax.swing.DefaultComboBoxModel<>();
+        targetPathCb = new JComboBox<>(targetPathModel);
+        targetPathCb.setEditable(true);
+        pickerPanel.add(targetPathCb, BorderLayout.CENTER);
         pickerBtn = new JButton("...");
         pickerBtn.addActionListener(e -> openFilePicker());
         pickerPanel.add(pickerBtn, BorderLayout.EAST);
@@ -278,9 +295,24 @@ public class MainStage {
     }
 
     private JPanel buildRightPanel() {
+        JPanel wrapper = new JPanel(new GridBagLayout());
+        wrapper.setPreferredSize(new Dimension(450, 0));
+        GridBagConstraints wgbc = new GridBagConstraints();
+        wgbc.gridx = 0; wgbc.weightx = 1.0; wgbc.fill = GridBagConstraints.HORIZONTAL;
+        wgbc.insets = new Insets(0, 0, 5, 0);
+
+        wgbc.gridy = 0; wgbc.weighty = 0;
+        wrapper.add(buildSettingsPanel(), wgbc);
+
+        wgbc.gridy = 1; wgbc.weighty = 1.0; wgbc.fill = GridBagConstraints.BOTH;
+        wrapper.add(buildToolsPanel(), wgbc);
+
+        return wrapper;
+    }
+
+    private JPanel buildSettingsPanel() {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(new TitledBorder("系统设置"));
-        panel.setPreferredSize(new Dimension(450, 0));
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 5, 4, 5);
@@ -303,15 +335,667 @@ public class MainStage {
         doubanLoginBtn.addActionListener(e -> openDoubanLogin());
         btnPanel.add(cleanCacheBtn);
         btnPanel.add(doubanLoginBtn);
-        metaViewerBtn = new JButton("查看元数据文件");
-        metaViewerBtn.addActionListener(e -> openMetaViewer());
-        btnPanel.add(metaViewerBtn);
         panel.add(btnPanel, gbc);
 
         gbc.gridx = 0; gbc.gridy = row + 1; gbc.gridwidth = 3; gbc.weightx = 0; gbc.weighty = 1.0; gbc.fill = GridBagConstraints.VERTICAL;
         panel.add(new JLabel(), gbc);
 
         return panel;
+    }
+
+    private JPanel buildToolsPanel() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(new TitledBorder("工具"));
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 3)) {
+            @Override
+            public java.awt.Dimension getPreferredSize() {
+                int w = getParent() != null ? getParent().getWidth() : 450;
+                if (w <= 0) w = 450;
+                FlowLayout fl = (FlowLayout) getLayout();
+                int hgap = fl.getHgap();
+                int vgap = fl.getVgap();
+                java.awt.Insets ins = getInsets();
+                int innerW = w - ins.left - ins.right;
+                int x = 0, rowH = 0;
+                java.util.List<Integer> rowHeights = new java.util.ArrayList<>();
+                for (int i = 0, n = getComponentCount(); i < n; i++) {
+                    java.awt.Dimension d = getComponent(i).getPreferredSize();
+                    if (x > 0 && x + d.width + hgap > innerW) {
+                        rowHeights.add(rowH);
+                        x = 0; rowH = 0;
+                    }
+                    x += d.width + hgap;
+                    rowH = Math.max(rowH, d.height);
+                }
+                if (x > 0) rowHeights.add(rowH);
+                int h = ins.top + ins.bottom;
+                for (int rh : rowHeights) h += rh;
+                if (rowHeights.size() > 1) h += (rowHeights.size() - 1) * vgap;
+                return new java.awt.Dimension(innerW, h + 4);
+            }
+        };
+        metaViewerBtn = new JButton("查看元数据文件");
+        metaViewerBtn.addActionListener(e -> openMetaViewer());
+        btnPanel.add(metaViewerBtn);
+        JButton vsmeta2NfoBtn = new JButton("vsmeta转nfo");
+        vsmeta2NfoBtn.addActionListener(e -> vsmetaToNfo());
+        btnPanel.add(vsmeta2NfoBtn);
+        JButton delNfoBtn = new JButton("递归删除nfo");
+        delNfoBtn.addActionListener(e -> deleteNfo());
+        btnPanel.add(delNfoBtn);
+        JButton fixSeasonBtn = new JButton("vsmeta修season.nfo");
+        fixSeasonBtn.addActionListener(e -> fixSeasonNfo());
+        btnPanel.add(fixSeasonBtn);
+        panel.add(btnPanel, BorderLayout.NORTH);
+        return panel;
+    }
+
+    private void vsmetaToNfo() {
+        String targetPath = getTargetPath();
+        if (targetPath.isEmpty()) { statusLb.setText("请先选择抓取目标"); return; }
+        recordTargetPath(targetPath);
+        File target = new File(targetPath);
+
+        java.util.List<File> vsmetaFiles = new java.util.ArrayList<>();
+        if (target.isDirectory()) {
+            collectVsmetaFiles(target, vsmetaFiles);
+        } else if (target.isFile()) {
+            File f = new File(target.getParentFile(), target.getName() + ".vsmeta");
+            if (f.exists()) vsmetaFiles.add(f);
+        }
+        if (vsmetaFiles.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "未找到任何vsmeta文件", "vsmeta转nfo", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        // 文件夹模式按文件名排序
+        if (target.isDirectory()) {
+            vsmetaFiles.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+        }
+
+        // 二次确认
+        int confirm = JOptionPane.showConfirmDialog(frame,
+                "找到 " + vsmetaFiles.size() + " 个vsmeta文件，开始转换？",
+                "vsmeta转nfo", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (confirm != JOptionPane.OK_OPTION) return;
+
+        setInputControlsEnabled(false);
+
+        // 进度弹窗
+        JDialog progressDialog = new JDialog(frame, "vsmeta转nfo", false);
+        JTextArea logArea = new JTextArea(20, 55);
+        logArea.setEditable(false);
+        Font cjk = Spider4VideoStationApp.getCJKFont();
+        if (cjk != null) logArea.setFont(cjk.deriveFont(12f));
+        JScrollPane logScroll = new JScrollPane(logArea);
+        logScroll.setPreferredSize(new Dimension(600, 350));
+        JButton closeBtn = new JButton("关闭");
+        closeBtn.setEnabled(false);
+        closeBtn.addActionListener(e -> progressDialog.dispose());
+        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        btnPanel.add(closeBtn);
+        JPanel content = new JPanel(new BorderLayout(5, 5));
+        content.setBorder(new EmptyBorder(10, 10, 10, 10));
+        content.add(logScroll, BorderLayout.CENTER);
+        content.add(btnPanel, BorderLayout.SOUTH);
+        progressDialog.setContentPane(content);
+        progressDialog.pack();
+        progressDialog.setLocationRelativeTo(frame);
+        progressDialog.setVisible(true);
+
+        int total = vsmetaFiles.size();
+        File tempDir = new File("D:/tmp");
+        tempDir.mkdirs();
+
+        new SwingWorker<Void, String>() {
+            private int doneCount = 0;
+            private int successCount = 0;
+            private int skippedCount = 0;
+            private java.util.List<String> failedPaths = new java.util.ArrayList<>();
+            private java.util.List<String> skippedPaths = new java.util.ArrayList<>();
+
+            @Override
+            protected Void doInBackground() throws Exception {
+                // 按目录分组剧集vsmeta（用于生成season.nfo）
+                java.util.Map<File, File> dirFirstEpVsmeta = new java.util.LinkedHashMap<>();
+                if (target.isDirectory()) {
+                    for (File vsmetaFile : vsmetaFiles) {
+                        File dir = vsmetaFile.getParentFile();
+                        if (dirFirstEpVsmeta.containsKey(dir)) continue;
+                        try {
+                            VSmeta v = new VSmeta(vsmetaFile);
+                            if (v.type == VSmeta.TypeEpisode) dirFirstEpVsmeta.put(dir, vsmetaFile);
+                        } catch (Exception ignored) {}
+                    }
+                }
+
+                // 找排序第一条剧集vsmeta，用于在目标根目录生成tvshow.nfo
+                File firstEpVsmetaFile = null;
+                if (target.isDirectory()) {
+                    for (File vsmetaFile : vsmetaFiles) {
+                        try {
+                            VSmeta v = new VSmeta(vsmetaFile);
+                            if (v.type == VSmeta.TypeEpisode) { firstEpVsmetaFile = vsmetaFile; break; }
+                        } catch (Exception ignored) {}
+                    }
+                }
+
+                for (File vsmetaFile : vsmetaFiles) {
+                    String vsmetaPath = vsmetaFile.getAbsolutePath();
+                    String basePath = vsmetaPath.substring(0, vsmetaPath.length() - ".vsmeta".length());
+                    int dot = basePath.lastIndexOf('.');
+                    if (dot < 0) { doneCount++; continue; }
+                    String nfoPath = basePath.substring(0, dot) + ".nfo";
+                    File nfoFile = new File(nfoPath);
+
+                    publish(vsmetaPath);
+
+                    if (nfoFile.exists()) {
+                        doneCount++; skippedCount++;
+                        skippedPaths.add(nfoPath);
+                        publish("[跳过]");
+                        continue;
+                    }
+
+                    try {
+                        VSmeta vsmeta = new VSmeta(vsmetaFile);
+                        ObjectNode node = buildJsonFromVSmeta(vsmeta);
+                        saveVsmetaImagesToTemp(vsmeta, node, tempDir, new File(basePath));
+                        if (vsmeta.type == VSmeta.TypeMovie) {
+                            NfoGenerator.generateMovie(nfoFile, node);
+                        } else {
+                            NfoGenerator.generateEpisode(nfoFile, node, vsmeta.season, vsmeta.episode);
+                        }
+                        doneCount++; successCount++;
+                        publish("[成功]");
+                    } catch (Exception e) {
+                        doneCount++; failedPaths.add(vsmetaPath + " (" + e.getMessage() + ")");
+                        publish("[失败] " + e.getMessage());
+                    }
+                }
+
+                // 为每个季文件夹生成season.nfo
+                for (java.util.Map.Entry<File, File> entry : dirFirstEpVsmeta.entrySet()) {
+                    File dir = entry.getKey();
+                    if (dir.equals(target)) continue; // 根目录不生成season.nfo
+                    File seasonNfo = new File(dir, "season.nfo");
+                    String seasonNfoPath = seasonNfo.getAbsolutePath();
+                    publish(seasonNfoPath);
+                    if (seasonNfo.exists()) {
+                        skippedPaths.add(seasonNfoPath);
+                        publish("[跳过]");
+                    } else {
+                        try {
+                            VSmeta epVsmeta = new VSmeta(entry.getValue());
+                            generateSeasonNfo(seasonNfo, epVsmeta, tempDir);
+                            successCount++;
+                            publish("[成功]");
+                        } catch (Exception e) {
+                            failedPaths.add(seasonNfoPath + " (" + e.getMessage() + ")");
+                            publish("[失败] " + e.getMessage());
+                        }
+                    }
+                }
+
+                // 在目标根目录生成tvshow.nfo（仅一份，取自排序第一条剧集vsmeta）
+                if (firstEpVsmetaFile != null) {
+                    File tvshowNfo = new File(target, "tvshow.nfo");
+                    String tvshowNfoPath = tvshowNfo.getAbsolutePath();
+                    publish(tvshowNfoPath);
+                    if (tvshowNfo.exists()) {
+                        skippedPaths.add(tvshowNfoPath);
+                        publish("[跳过]");
+                    } else {
+                        try {
+                            VSmeta epVsmeta = new VSmeta(firstEpVsmetaFile);
+                            generateTvshowNfo(tvshowNfo, epVsmeta, tempDir);
+                            successCount++;
+                            publish("[成功]");
+                        } catch (Exception e) {
+                            failedPaths.add(tvshowNfoPath + " (" + e.getMessage() + ")");
+                            publish("[失败] " + e.getMessage());
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            @Override
+            protected void process(java.util.List<String> chunks) {
+                for (String msg : chunks) {
+                    logArea.append(msg + "\n");
+                }
+                logArea.setCaretPosition(logArea.getDocument().getLength());
+            }
+
+            @Override
+            protected void done() {
+                try { get(); } catch (Exception ignored) {}
+                StringBuilder summary = new StringBuilder();
+                summary.append("\n===== 完成 =====\n");
+                summary.append("成功: ").append(successCount)
+                        .append(", 跳过: ").append(skippedCount)
+                        .append(", 失败: ").append(failedPaths.size()).append("\n");
+                if (!skippedPaths.isEmpty()) {
+                    summary.append("\n— 跳过清单 —\n");
+                    for (String p : skippedPaths) summary.append("  ").append(p).append("\n");
+                }
+                if (!failedPaths.isEmpty()) {
+                    summary.append("\n— 失败清单 —\n");
+                    for (String p : failedPaths) summary.append("  ").append(p).append("\n");
+                }
+                logArea.append(summary.toString());
+                logArea.setCaretPosition(logArea.getDocument().getLength());
+                closeBtn.setEnabled(true);
+                statusLb.setText("vsmeta转nfo完成: 成功" + successCount + ", 跳过" + skippedCount + ", 失败" + failedPaths.size());
+                setInputControlsEnabled(true);
+                onTypeSelect();
+                updateApplyButtons();
+            }
+        }.execute();
+    }
+
+    private void deleteNfo() {
+        String targetPath = getTargetPath();
+        if (targetPath.isEmpty()) { statusLb.setText("请先选择抓取目标"); return; }
+        recordTargetPath(targetPath);
+        File target = new File(targetPath);
+        if (!target.isDirectory()) {
+            JOptionPane.showMessageDialog(frame, "请选择文件夹", "递归删除nfo", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        java.util.List<File> nfoFiles = new java.util.ArrayList<>();
+        collectNfoFiles(target, nfoFiles);
+        if (nfoFiles.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "未找到任何nfo文件", "递归删除nfo", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+        int confirm = JOptionPane.showConfirmDialog(frame,
+                "找到 " + nfoFiles.size() + " 个nfo文件，确认删除？",
+                "递归删除nfo", JOptionPane.OK_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (confirm != JOptionPane.OK_OPTION) return;
+
+        int deleted = 0;
+        for (File f : nfoFiles) {
+            if (f.delete()) deleted++;
+        }
+        statusLb.setText("已删除 " + deleted + "/" + nfoFiles.size() + " 个nfo文件");
+        JOptionPane.showMessageDialog(frame, "已删除 " + deleted + " 个nfo文件", "递归删除nfo", JOptionPane.INFORMATION_MESSAGE);
+    }
+
+    private void fixSeasonNfo() {
+        String targetPath = getTargetPath();
+        if (targetPath.isEmpty()) { statusLb.setText("请先选择抓取目标"); return; }
+        File target = new File(targetPath);
+        if (!target.isDirectory()) {
+            JOptionPane.showMessageDialog(frame, "请选择文件夹", "vsmeta修season.nfo", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        recordTargetPath(targetPath);
+
+        // 扫描所有season.nfo
+        java.util.List<File> seasonNfoFiles = new java.util.ArrayList<>();
+        collectSeasonNfoFiles(target, seasonNfoFiles);
+        if (seasonNfoFiles.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "未找到任何season.nfo", "vsmeta修season.nfo", JOptionPane.INFORMATION_MESSAGE);
+            return;
+        }
+
+        int confirm = JOptionPane.showConfirmDialog(frame,
+                "找到 " + seasonNfoFiles.size() + " 个season.nfo，修正lockdata和title？",
+                "vsmeta修season.nfo", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+        if (confirm != JOptionPane.OK_OPTION) return;
+
+        setInputControlsEnabled(false);
+        statusLb.setText("vsmeta修season.nfo: 处理中...");
+
+        new SwingWorker<String, String>() {
+            private int fixed = 0;
+            private int failed = 0;
+
+            @Override
+            protected String doInBackground() throws Exception {
+                for (File seasonNfo : seasonNfoFiles) {
+                    File dir = seasonNfo.getParentFile();
+                    // 找同目录下第一条剧集vsmeta
+                    VSmeta epVsmeta = null;
+                    File[] files = dir.listFiles();
+                    if (files != null) {
+                        java.util.Arrays.sort(files, (a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+                        for (File f : files) {
+                            if (!f.getName().endsWith(".vsmeta")) continue;
+                            try { VSmeta v = new VSmeta(f); if (v.type == VSmeta.TypeEpisode) { epVsmeta = v; break; } }
+                            catch (Exception ignored) {}
+                        }
+                    }
+
+                    publish(seasonNfo.getAbsolutePath());
+
+                    try {
+                        String xml = new String(java.nio.file.Files.readAllBytes(seasonNfo.toPath()),
+                                java.nio.charset.StandardCharsets.UTF_8);
+                        Document doc = Jsoup.parse(xml, "", org.jsoup.parser.Parser.xmlParser());
+                        boolean changed = false;
+
+                        Element lockEl = doc.selectFirst("lockdata");
+                        if (lockEl == null) {
+                            doc.selectFirst("season").prependElement("lockdata").text("true");
+                            changed = true;
+                        } else if (!"true".equals(lockEl.text())) {
+                            lockEl.text("true");
+                            changed = true;
+                        }
+
+                        if (epVsmeta != null && notEmpty(epVsmeta.showTitle)) {
+                            Element titleEl = doc.selectFirst("title");
+                            if (titleEl == null) {
+                                doc.selectFirst("season").prependElement("title").text(epVsmeta.showTitle);
+                                changed = true;
+                            } else if (!epVsmeta.showTitle.equals(titleEl.text())) {
+                                titleEl.text(epVsmeta.showTitle);
+                                changed = true;
+                            }
+                        }
+
+                        if (changed) {
+                            doc.outputSettings().syntax(Document.OutputSettings.Syntax.xml);
+                            java.io.FileOutputStream fos = new java.io.FileOutputStream(seasonNfo);
+                            fos.write(doc.outerHtml().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                            fos.close();
+                            fixed++;
+                            publish("[已修正]");
+                        } else {
+                            publish("[无变化]");
+                        }
+                    } catch (Exception e) {
+                        failed++;
+                        publish("[失败] " + e.getMessage());
+                    }
+                }
+                return "修正" + fixed + "个, 失败" + failed + "个";
+            }
+
+            @Override
+            protected void process(java.util.List<String> chunks) {
+                for (String msg : chunks) statusLb.setText(msg);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    String msg = get();
+                    statusLb.setText("vsmeta修season.nfo: " + msg);
+                    JOptionPane.showMessageDialog(frame, msg, "vsmeta修season.nfo", JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception e) {
+                    statusLb.setText("vsmeta修season.nfo失败: " + e.getMessage());
+                } finally {
+                    setInputControlsEnabled(true);
+                }
+            }
+        }.execute();
+    }
+
+    private void collectSeasonNfoFiles(File dir, java.util.List<File> result) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f.isDirectory()) {
+                collectSeasonNfoFiles(f, result);
+            } else if (f.getName().equals("season.nfo")) {
+                result.add(f);
+            }
+        }
+    }
+
+    private void collectNfoFiles(File dir, java.util.List<File> result) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f.isDirectory()) {
+                collectNfoFiles(f, result);
+            } else if (f.getName().endsWith(".nfo")) {
+                result.add(f);
+            }
+        }
+    }
+
+    private void collectVsmetaFiles(File dir, java.util.List<File> result) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            if (f.isDirectory()) {
+                collectVsmetaFiles(f, result);
+            } else if (f.getName().endsWith(".vsmeta")) {
+                result.add(f);
+            }
+        }
+    }
+
+    private static ObjectNode buildJsonFromVSmeta(VSmeta vsmeta) {
+        ObjectNode node = Utils.ObjectMapper.createObjectNode();
+        if (vsmeta.type == VSmeta.TypeEpisode) {
+            node.put("title", orEmpty(vsmeta.episodeTitle));
+        } else {
+            node.put("title", orEmpty(vsmeta.showTitle));
+        }
+        node.put("tagline", orEmpty(vsmeta.episodeTitle));
+        node.put("summary", orEmpty(vsmeta.chapterSummary));
+        node.put("original_available", orEmpty(vsmeta.episodeReleaseDate));
+        node.put("certificate", orEmpty(vsmeta.classification));
+
+        ArrayNode genreArr = Utils.ObjectMapper.createArrayNode();
+        if (vsmeta.genres != null) for (String g : vsmeta.genres) genreArr.add(g);
+        node.set("genre", genreArr);
+
+        ArrayNode actorArr = Utils.ObjectMapper.createArrayNode();
+        if (vsmeta.casts != null) for (String a : vsmeta.casts) {
+            ObjectNode ao = Utils.ObjectMapper.createObjectNode();
+            ao.put("name", a);
+            actorArr.add(ao);
+        }
+        node.set("actor", actorArr);
+
+        ArrayNode dirArr = Utils.ObjectMapper.createArrayNode();
+        if (vsmeta.directors != null) for (String d : vsmeta.directors) dirArr.add(d);
+        node.set("director", dirArr);
+
+        ArrayNode writerArr = Utils.ObjectMapper.createArrayNode();
+        if (vsmeta.writers != null) for (String w : vsmeta.writers) writerArr.add(w);
+        node.set("writer", writerArr);
+
+        if (vsmeta.season > 0) node.put("season", vsmeta.season);
+        if (vsmeta.episode > 0) node.put("episode", vsmeta.episode);
+
+        return node;
+    }
+
+    private static void saveVsmetaImagesToTemp(VSmeta vsmeta,
+            ObjectNode node, File tempDir, File videoFile) {
+        String posterB64;
+        if (vsmeta.type == VSmeta.TypeEpisode) {
+            posterB64 = vsmeta.episodeThumbData != null ? vsmeta.episodeThumbData.trim() : null;
+            // 没有缩略图时，用 FFmpeg 现场截图
+            if ((posterB64 == null || posterB64.isEmpty()) && videoFile.exists()) {
+                try {
+                    MediaInfo mi = FFmpegUtils.mediaInfo(videoFile);
+                    long pos = (long)(mi.format.parseDuration() * 0.618);
+                    File snap = new File(tempDir, "v2n_snap_" + System.currentTimeMillis() + ".jpg");
+                    FFmpegUtils.snapshot(videoFile, FFmpegUtils.formatDuration(pos), snap);
+                    if (snap.exists() && snap.length() > 0) {
+                        posterB64 = VSmeta.readImgData(snap);
+                        snap.delete();
+                    }
+                } catch (Exception e) {
+                    System.err.println("[vsmeta转nfo] FFmpeg截图失败: " + videoFile.getAbsolutePath() + " — " + e.getMessage());
+                }
+            }
+            // FFmpeg未能生成时，用posterData兜底
+            if (posterB64 == null || posterB64.isEmpty()) {
+                posterB64 = vsmeta.posterData != null ? vsmeta.posterData.trim() : null;
+            }
+        } else {
+            posterB64 = vsmeta.posterData != null ? vsmeta.posterData.trim() : null;
+        }
+        String backdropB64 = vsmeta.backdropData != null ? vsmeta.backdropData.trim() : null;
+
+        boolean hasRating = vsmeta.rating != null && vsmeta.rating.length == 1
+                && !java.util.Arrays.equals(vsmeta.rating, VSmeta.RatingRaw);
+        if (posterB64 == null && backdropB64 == null && !hasRating) return;
+
+        ArrayNode extraArr = Utils.ObjectMapper.createArrayNode();
+        ObjectNode extraSite = Utils.ObjectMapper.createObjectNode();
+
+        if (hasRating) {
+            double score = (vsmeta.rating[0] & 0xFF) / 10.0;
+            ObjectNode ratingObj = Utils.ObjectMapper.createObjectNode();
+            ratingObj.put("score", score);
+            extraSite.set("rating", ratingObj);
+        }
+        if (posterB64 != null && !posterB64.isEmpty()) {
+            File f = saveBase64Image(posterB64, new File(tempDir, "v2n_poster_" + System.currentTimeMillis() + ".jpg"));
+            if (f != null) {
+                ArrayNode pa = Utils.ObjectMapper.createArrayNode();
+                pa.add(f.getAbsolutePath());
+                extraSite.set("poster", pa);
+            }
+        }
+        if (backdropB64 != null && !backdropB64.isEmpty()) {
+            File f = saveBase64Image(backdropB64, new File(tempDir, "v2n_backdrop_" + System.currentTimeMillis() + ".jpg"));
+            if (f != null) {
+                ArrayNode ba = Utils.ObjectMapper.createArrayNode();
+                ba.add(f.getAbsolutePath());
+                extraSite.set("backdrop", ba);
+            }
+        }
+
+        extraArr.add(extraSite);
+        node.set("extra", extraArr);
+    }
+
+    private static void generateTvshowNfo(File nfoFile, VSmeta vsmeta, File tempDir) throws Exception {
+        StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<tvshow>\n");
+        sb.append("  <lockdata>true</lockdata>\n");
+        String title = extractTitleFromFolder(nfoFile.getParentFile());
+        if (notEmpty(title)) sb.append("  <title>").append(escXml(title)).append("</title>\n");
+        if (notEmpty(vsmeta.tvshowSummary)) sb.append("  <plot>").append(escXml(vsmeta.tvshowSummary)).append("</plot>\n");
+        if (vsmeta.tvShowYear > 0) sb.append("  <year>").append(vsmeta.tvShowYear).append("</year>\n");
+        if (notEmpty(vsmeta.releaseDateTvShow)) sb.append("  <premiered>").append(escXml(vsmeta.releaseDateTvShow)).append("</premiered>\n");
+        if (vsmeta.genres != null) for (String g : vsmeta.genres) sb.append("  <genre>").append(escXml(g)).append("</genre>\n");
+        if (vsmeta.casts != null) for (String c : vsmeta.casts) sb.append("  <actor><name>").append(escXml(c)).append("</name></actor>\n");
+        if (vsmeta.directors != null) for (String d : vsmeta.directors) sb.append("  <director>").append(escXml(d)).append("</director>\n");
+        if (vsmeta.writers != null) for (String w : vsmeta.writers) sb.append("  <credits>").append(escXml(w)).append("</credits>\n");
+
+        // 海报/背景图
+        File dir = nfoFile.getParentFile();
+        boolean hasArt = false;
+        StringBuilder artXml = new StringBuilder();
+        String posterB64 = vsmeta.posterData != null ? vsmeta.posterData.trim() : null;
+        if (posterB64 != null && !posterB64.isEmpty()) {
+            File f = saveBase64Image(posterB64, new File(tempDir, "v2n_tvthumb_" + System.currentTimeMillis() + ".jpg"));
+            if (f != null) {
+                String dest = copyImageFile(f, "folder", dir);
+                if (dest != null) {
+                    sb.append("  <thumb>").append(escXml(dest)).append("</thumb>\n");
+                    artXml.append("    <poster>").append(escXml(dest)).append("</poster>\n");
+                    hasArt = true;
+                }
+            }
+        }
+        String backdropB64 = vsmeta.backdropData != null ? vsmeta.backdropData.trim() : null;
+        if (backdropB64 != null && !backdropB64.isEmpty()) {
+            File f = saveBase64Image(backdropB64, new File(tempDir, "v2n_tvfanart_" + System.currentTimeMillis() + ".jpg"));
+            if (f != null) {
+                String dest = copyImageFile(f, "backdrop", dir);
+                if (dest != null) {
+                    sb.append("  <fanart>").append(escXml(dest)).append("</fanart>\n");
+                    artXml.append("    <fanart>").append(escXml(dest)).append("</fanart>\n");
+                    hasArt = true;
+                }
+            }
+        }
+        if (hasArt) sb.append("  <art>\n").append(artXml).append("  </art>\n");
+
+        sb.append("</tvshow>\n");
+        java.io.FileOutputStream fos = new java.io.FileOutputStream(nfoFile);
+        fos.write(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        fos.close();
+    }
+
+    /** 从文件夹名智能提取节目名：去掉排序前缀字母和年份后缀 */
+    private static String extractTitleFromFolder(File dir) {
+        String name = dir.getName();
+        // 去掉前导单字母前缀（如 "B 冰火魔厨 (2021)" → "冰火魔厨 (2021)"）
+        name = name.replaceFirst("^[A-Za-z]\\s+", "");
+        // 去掉末尾括号年份（如 "冰火魔厨 (2021)" → "冰火魔厨"）
+        name = name.replaceFirst("\\s*\\(\\d{4}\\)\\s*$", "");
+        return name.trim();
+    }
+
+    private static void generateSeasonNfo(File nfoFile, VSmeta vsmeta, File tempDir) throws Exception {
+        StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<season>\n");
+        sb.append("  <lockdata>true</lockdata>\n");
+        if (notEmpty(vsmeta.showTitle)) sb.append("  <title>").append(escXml(vsmeta.showTitle)).append("</title>\n");
+        String seasonPlot = notEmpty(vsmeta.tvshowSummary) ? vsmeta.tvshowSummary : vsmeta.chapterSummary;
+        if (notEmpty(seasonPlot)) sb.append("  <plot>").append(escXml(seasonPlot)).append("</plot>\n");
+        if (vsmeta.season > 0) sb.append("  <seasonnumber>").append(vsmeta.season).append("</seasonnumber>\n");
+        if (notEmpty(vsmeta.episodeReleaseDate)) sb.append("  <premiered>").append(escXml(vsmeta.episodeReleaseDate)).append("</premiered>\n");
+        if (vsmeta.year > 0) sb.append("  <year>").append(vsmeta.year).append("</year>\n");
+
+        // 海报
+        File dir = nfoFile.getParentFile();
+        String posterB64 = vsmeta.posterData != null ? vsmeta.posterData.trim() : null;
+        if (posterB64 != null && !posterB64.isEmpty()) {
+            File f = saveBase64Image(posterB64, new File(tempDir, "v2n_season_poster_" + System.currentTimeMillis() + ".jpg"));
+            if (f != null) {
+                String dest = copyImageFile(f, "folder", dir);
+                if (dest != null) {
+                    sb.append("  <thumb>").append(escXml(dest)).append("</thumb>\n");
+                    sb.append("  <art>\n    <poster>").append(escXml(dest)).append("</poster>\n  </art>\n");
+                }
+            }
+        }
+
+        sb.append("</season>\n");
+        java.io.FileOutputStream fos = new java.io.FileOutputStream(nfoFile);
+        fos.write(sb.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        fos.close();
+    }
+
+    private static String copyImageFile(File src, String baseName, File dir) {
+        try {
+            String ext = src.getName().substring(src.getName().lastIndexOf('.') + 1);
+            File dest = new File(dir, baseName + "." + ext);
+            java.nio.file.Files.copy(src.toPath(), dest.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            return dest.getName();
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static boolean notEmpty(String s) {
+        return s != null && !s.isEmpty();
+    }
+
+    private static String escXml(String s) {
+        return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+                .replace("\"", "&quot;").replace("'", "&apos;");
+    }
+
+    private static File saveBase64Image(String base64, File dest) {
+        try {
+            byte[] data = Base64.getDecoder().decode(base64.replace("\n", "").replace("\r", ""));
+            java.io.FileOutputStream fos = new java.io.FileOutputStream(dest);
+            fos.write(data);
+            fos.close();
+            return dest;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    private static String orEmpty(String s) {
+        return s == null ? "" : s;
     }
 
     private int addSettingRow(JPanel panel, GridBagConstraints gbc, int row, String label, JTextField tf) {
@@ -368,6 +1052,9 @@ public class MainStage {
 
         TargetSite ts = findTargetSite();
         if (ts == null) return;
+
+        String targetPath = getTargetPath();
+        if (!targetPath.isEmpty()) recordTargetPath(targetPath);
 
         String type = (String) typeCb.getSelectedItem();
         String lang = (String) langCb.getSelectedItem();
@@ -556,23 +1243,74 @@ public class MainStage {
     }
 
     private void openMetaViewer() {
-        MetaViewerDialog dialog = new MetaViewerDialog(frame, resolveInitialDir(targetPathTf.getText().trim()));
+        String targetPath = getTargetPath();
+        if (!targetPath.isEmpty()) recordTargetPath(targetPath);
+        MetaViewerDialog dialog = new MetaViewerDialog(frame, resolveInitialDir(targetPath));
         dialog.setVisible(true);
     }
 
     private void openFilePicker() {
-        File initialDir = resolveInitialDir(targetPathTf.getText().trim());
+        File initialDir = resolveInitialDir(getTargetPath());
         FilePickerDialog dialog = new FilePickerDialog(frame, initialDir);
         dialog.setVisible(true);
         FilePickerDialog.DialogResult result = dialog.getResult();
         if (result == null) return;
-        targetPathTf.setText(result.path);
+        setTargetPath(result.path);
+        recordTargetPath(result.path);
         titleTf.setText(stripExtension(result.name));
         updateApplyButtons();
     }
 
+    private String getTargetPath() {
+        Object sel = targetPathModel.getSelectedItem();
+        return sel != null ? sel.toString().trim() : "";
+    }
+
+    private void setTargetPath(String path) {
+        targetPathCb.setSelectedItem(path);
+    }
+
+    private static final int MAX_RECENT_TARGETS = 20;
+
+    private void recordTargetPath(String path) {
+        if (path == null || (path = path.trim()).isEmpty()) return;
+        // 去重
+        for (int i = 0; i < targetPathModel.getSize(); i++) {
+            if (path.equals(targetPathModel.getElementAt(i))) {
+                targetPathModel.removeElementAt(i);
+                break;
+            }
+        }
+        targetPathModel.insertElementAt(path, 0);
+        targetPathCb.setSelectedItem(path);
+        while (targetPathModel.getSize() > MAX_RECENT_TARGETS)
+            targetPathModel.removeElementAt(targetPathModel.getSize() - 1);
+        saveRecentTargets();
+    }
+
+    private void loadRecentTargets() {
+        try {
+            String json = configService.gets(java.util.Collections.singletonList("recentTargets")).get("recentTargets");
+            if (json != null && !json.isEmpty()) {
+                com.fasterxml.jackson.databind.JsonNode arr = Utils.ObjectMapper.readTree(json);
+                for (com.fasterxml.jackson.databind.JsonNode item : arr) {
+                    targetPathModel.addElement(item.asText());
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    private void saveRecentTargets() {
+        try {
+            com.fasterxml.jackson.databind.node.ArrayNode arr = Utils.ObjectMapper.createArrayNode();
+            for (int i = 0; i < targetPathModel.getSize(); i++)
+                arr.add(targetPathModel.getElementAt(i));
+            configService.set("recentTargets", Utils.ObjectMapper.writeValueAsString(arr));
+        } catch (Exception ignored) {}
+    }
+
     private void updateApplyButtons() {
-        boolean enable = !targetPathTf.getText().trim().isEmpty()
+        boolean enable = !getTargetPath().isEmpty()
             && resultTitleList.getSelectedIndex() >= 0;
         genVsmetaBtn.setEnabled(enable);
         genNfoBtn.setEnabled(enable);
@@ -582,7 +1320,7 @@ public class MainStage {
 
     private void setInputControlsEnabled(boolean enabled) {
         searchBtn.setEnabled(enabled);
-        targetPathTf.setEnabled(enabled);
+        targetPathCb.setEnabled(enabled);
         pickerBtn.setEnabled(enabled);
         targetSiteCb.setEnabled(enabled);
         typeCb.setEnabled(enabled);
@@ -622,7 +1360,7 @@ public class MainStage {
         if (f == null) return;
         resultTitleList.setFont(f);
         resultRawTa.setFont(f);
-        targetPathTf.setFont(f);
+        targetPathCb.getEditor().getEditorComponent().setFont(f);
         titleTf.setFont(f);
     }
 
@@ -746,7 +1484,7 @@ public class MainStage {
     }
 
     private void generateMetadata(boolean vsmeta) {
-        String targetPath = targetPathTf.getText().trim();
+        String targetPath = getTargetPath();
         File target = new File(targetPath);
         int selectedIdx = resultTitleList.getSelectedIndex();
         if (selectedIdx < 0 || selectedIdx >= lastResults.size()) return;
@@ -879,7 +1617,7 @@ public class MainStage {
     private void renameStandard() {
         int selectedIdx = resultTitleList.getSelectedIndex();
         if (selectedIdx < 0 || selectedIdx >= lastResults.size()) return;
-        String targetPath = targetPathTf.getText().trim();
+        String targetPath = getTargetPath();
         File target = new File(targetPath);
         if (!target.isFile()) {
             statusLb.setText("请选择视频文件");
@@ -915,7 +1653,7 @@ public class MainStage {
         }
 
         if (target.renameTo(newFile)) {
-            targetPathTf.setText(newFile.getAbsolutePath());
+            setTargetPath(newFile.getAbsolutePath());
             statusLb.setText("已重命名为 " + newFile.getName());
         } else {
             statusLb.setText("重命名失败");

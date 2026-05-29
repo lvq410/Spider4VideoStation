@@ -21,6 +21,7 @@ public class NfoGenerator {
         File dir = nfoFile.getParentFile();
 
         StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<movie>\n");
+        tagRaw(sb, "lockdata", "true");
         tag(sb, "title", node.get("title"));
         tag(sb, "tagline", node.get("tagline"));
         tag(sb, "plot", node.get("summary"));
@@ -48,6 +49,7 @@ public class NfoGenerator {
         File dir = nfoFile.getParentFile();
 
         StringBuilder sb = new StringBuilder("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<episodedetails>\n");
+        tagRaw(sb, "lockdata", "true");
         tag(sb, "title", node.get("title"));
         tagRaw(sb, "season", String.valueOf(season));
         tagRaw(sb, "episode", String.valueOf(episode));
@@ -69,16 +71,26 @@ public class NfoGenerator {
 
     private static void copyAndTagImages(StringBuilder sb, JsonNode extra, String base, File dir) {
         if (extra == null) return;
+        StringBuilder art = new StringBuilder();
         String poster = findInExtraDeep(extra, "poster");
+        String thumbName = null;
         if (poster != null) {
-            String name = copyImage(poster, base + "-thumb", dir);
-            if (name != null) tagRaw(sb, "thumb", name);
+            thumbName = copyImage(poster, base + "-thumb", dir);
+            if (thumbName != null) {
+                tagRaw(sb, "thumb", thumbName);
+                art.append("    <poster>").append(esc(thumbName)).append("</poster>\n");
+            }
         }
         String backdrop = findInExtraDeep(extra, "backdrop");
+        String fanartName = null;
         if (backdrop != null) {
-            String name = copyImage(backdrop, base + "-fanart", dir);
-            if (name != null) tagRaw(sb, "fanart", name);
+            fanartName = copyImage(backdrop, base + "-fanart", dir);
+            if (fanartName != null) {
+                tagRaw(sb, "fanart", fanartName);
+                art.append("    <fanart>").append(esc(fanartName)).append("</fanart>\n");
+            }
         }
+        if (art.length() > 0) sb.append("  <art>\n").append(art).append("  </art>\n");
     }
 
     /** 从 extra 中提取评分 */

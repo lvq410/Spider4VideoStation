@@ -21,6 +21,7 @@ import javax.imageio.ImageIO;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JDialog;
 import javax.swing.JLabel;
@@ -252,9 +253,25 @@ public class MetaViewerDialog extends JDialog {
                     JPanel wrapper = new JPanel(new BorderLayout(0, 5));
                     JButton saveBtn = new JButton("保存");
                     saveBtn.addActionListener(e -> performSave());
+
+                    boolean lockdata = false;
+                    if (!isVSmetaMode) {
+                        Element lockEl = currentNfoDoc.selectFirst("lockdata");
+                        lockdata = lockEl != null && "true".equalsIgnoreCase(lockEl.ownText());
+                    } else {
+                        lockdata = (currentVSmeta.locked != null && currentVSmeta.locked == 1)
+                                || (currentVSmeta.episodeLocked != null && currentVSmeta.episodeLocked == 1);
+                    }
+                    JCheckBox lockCb = new JCheckBox("锁定元数据");
+                    lockCb.setSelected(lockdata);
+                    fieldComponents.put("lockdata", lockCb);
+
+                    JPanel topPanel = new JPanel(new BorderLayout());
+                    topPanel.add(lockCb, BorderLayout.WEST);
                     JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT));
                     btnPanel.add(saveBtn);
-                    wrapper.add(btnPanel, BorderLayout.NORTH);
+                    topPanel.add(btnPanel, BorderLayout.EAST);
+                    wrapper.add(topPanel, BorderLayout.NORTH);
                     wrapper.add(built, BorderLayout.CENTER);
 
                     detailPanel.removeAll();
@@ -347,6 +364,7 @@ public class MetaViewerDialog extends JDialog {
         addRow(rows, "year", "年份", ownText(doc, "year"));
         addRow(rows, "aired", "播出", ownText(doc, "aired"));
         addRow(rows, "season", "季", ownText(doc, "season"));
+        addRow(rows, "seasonnumber", "季号", ownText(doc, "seasonnumber"));
         addRow(rows, "episode", "集", ownText(doc, "episode"));
         addRow(rows, "mpaa", "分级", ownText(doc, "mpaa"));
         addRow(rows, "rating", "评分", ownText(doc, "rating"));
@@ -357,8 +375,15 @@ public class MetaViewerDialog extends JDialog {
 
         for (Element el : doc.select("thumb"))
             addImageRow(rows, "缩略图", loadImageFile(parentDir, ownText(el)));
-        for (Element el : doc.select("fanart"))
+        for (Element el : doc.select("fanart")) {
+            if (el.parent() != null && "art".equals(el.parent().tagName())) continue;
             addImageRow(rows, "背景", loadImageFile(parentDir, ownText(el)));
+        }
+        // Jellyfin <art> 扩展
+        for (Element el : doc.select("art poster"))
+            addImageRow(rows, "海报(art)", loadImageFile(parentDir, ownText(el)));
+        for (Element el : doc.select("art fanart"))
+            addImageRow(rows, "背景(art)", loadImageFile(parentDir, ownText(el)));
 
         return assemblePanel(rows);
     }
@@ -384,6 +409,7 @@ public class MetaViewerDialog extends JDialog {
     // ==================== 组装面板 ====================
 
     /** 添加可编辑文本行 */
+    /** 添加文本行 */
     private void addRow(java.util.List<java.awt.Component> rows, String fieldKey, String label, String value) {
         if (isEmpty(value)) return;
         rows.add(new JLabel(label + ":"));
@@ -455,7 +481,7 @@ public class MetaViewerDialog extends JDialog {
     private static String listText(Document doc, String tag) {
         java.util.List<String> items = new java.util.ArrayList<>();
         for (Element el : doc.select(tag)) {
-            String v = el.ownText();
+            String v = el.text();
             if (v != null && !v.isEmpty()) items.add(v);
         }
         return items.isEmpty() ? null : String.join(", ", items);
@@ -512,6 +538,10 @@ public class MetaViewerDialog extends JDialog {
         String episodeStr = getFieldText("episode");
         if (episodeStr != null && !episodeStr.isEmpty()) m.episode = Integer.parseInt(episodeStr);
 
+        boolean lock = "true".equalsIgnoreCase(getFieldText("lockdata"));
+        m.locked = lock ? (byte)1 : null;
+        m.episodeLocked = lock ? (byte)1 : null;
+
         m.write(currentMetaFile);
     }
 
@@ -523,6 +553,8 @@ public class MetaViewerDialog extends JDialog {
         StringBuilder sb = new StringBuilder();
         sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n");
         sb.append("<").append(rootTag).append(">\n");
+
+        appendNfoTag(sb, "lockdata", getFieldText("lockdata"));
 
         appendNfoTag(sb, "title", getFieldText("title"));
         appendNfoTag(sb, "tagline", getFieldText("tagline"));
@@ -536,10 +568,10 @@ public class MetaViewerDialog extends JDialog {
         if ("movie".equals(rootTag))
             appendNfoTag(sb, "rating", getFieldText("rating"));
 
-        appendNfoListTags(sb, "genre", getFieldText("genre"));
-        appendNfoListTags(sb, "actor", getFieldText("actor"));
-        appendNfoListTags(sb, "director", getFieldText("director"));
-        appendNfoListTags(sb, "credits", getFieldText("credits"));
+        appendNfoListTags(sb, "genre", getFieldText("genre"), null);
+        appendNfoListTags(sb, "actor", getFieldText("actor"), "name");
+        appendNfoListTags(sb, "director", getFieldText("director"), null);
+        appendNfoListTags(sb, "credits", getFieldText("credits"), null);
 
         for (Element el : doc.select("thumb")) {
             String v = el.ownText();
@@ -564,6 +596,7 @@ public class MetaViewerDialog extends JDialog {
         javax.swing.JComponent c = fieldComponents.get(key);
         if (c == null) return null;
         if (c instanceof JTextArea) return ((JTextArea) c).getText().trim();
+        if (c instanceof JCheckBox) return ((JCheckBox) c).isSelected() ? "true" : "false";
         if (c instanceof JComboBox) {
             Object sel = ((JComboBox<?>) c).getSelectedItem();
             return sel != null ? sel.toString() : null;
@@ -590,11 +623,15 @@ public class MetaViewerDialog extends JDialog {
             sb.append("  <").append(tag).append(">").append(escXml(val)).append("</").append(tag).append(">\n");
     }
 
-    private static void appendNfoListTags(StringBuilder sb, String tag, String text) {
+    private static void appendNfoListTags(StringBuilder sb, String tag, String text, String subTag) {
         if (text == null || text.trim().isEmpty()) return;
         for (String val : text.split("\\s*,\\s*")) {
-            if (!val.isEmpty())
-                sb.append("  <").append(tag).append(">").append(escXml(val)).append("</").append(tag).append(">\n");
+            if (!val.isEmpty()) {
+                sb.append("  <").append(tag).append(">");
+                if (subTag != null) sb.append("<").append(subTag).append(">").append(escXml(val)).append("</").append(subTag).append(">");
+                else sb.append(escXml(val));
+                sb.append("</").append(tag).append(">\n");
+            }
         }
     }
 
