@@ -64,6 +64,7 @@ import com.lvt4j.spider4videostation.metadata.MetadataGenerator;
 import com.lvt4j.spider4videostation.metadata.NfoGenerator;
 import com.lvt4j.spider4videostation.metadata.VSmeta;
 import com.lvt4j.spider4videostation.service.ConfigService;
+import com.lvt4j.spider4videostation.service.DsmApiClient;
 import com.lvt4j.spider4videostation.service.FileCacher;
 import com.lvt4j.spider4videostation.service.SearchOrchestratorService;
 
@@ -122,10 +123,15 @@ public class MainStage {
     private JTextField originalAvailableTf;
     private JTextField doubanMaxLimitTf;
     private JTextField baikeBaiduMaxLimitTf;
+    private JTextField dsmAddrTf;
+    private JTextField dsmAccountTf;
+    private JTextField dsmPasswdTf;
 
     public static final List<String> SETTING_KEYS = Arrays.asList(
         "webDriverAddr", "javdbOrigin", "fileEpOffset", "siteEpOffset",
-        "originalAvailable", "doubanMaxLimit", "baikeBaiduMaxLimit");
+        "originalAvailable", "doubanMaxLimit", "baikeBaiduMaxLimit",
+        "dsmAddr", "dsmAccount", "dsmPasswd",
+        "vsUnregisteredScanTempFolder");
 
     public void show() {
         frame = new JFrame("Spider4VideoStation");
@@ -326,6 +332,9 @@ public class MainStage {
         row = addSettingRow(panel, gbc, row, "强制发布日期", originalAvailableTf = new JTextField(10));
         row = addSettingRow(panel, gbc, row, "豆瓣结果条数", doubanMaxLimitTf = new JTextField(10));
         row = addSettingRow(panel, gbc, row, "百度百科结果条数", baikeBaiduMaxLimitTf = new JTextField(10));
+        row = addSettingRow(panel, gbc, row, "DSM地址", dsmAddrTf = new JTextField(25));
+        row = addSettingRow(panel, gbc, row, "DSM账号", dsmAccountTf = new JTextField(10));
+        row = addSettingRow(panel, gbc, row, "DSM密码", dsmPasswdTf = new JTextField(10));
 
         gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 3; gbc.weightx = 1.0; gbc.fill = GridBagConstraints.NONE; gbc.anchor = GridBagConstraints.WEST;
         JPanel btnPanel = new JPanel(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 10, 0));
@@ -386,6 +395,12 @@ public class MainStage {
         JButton fixSeasonBtn = new JButton("vsmeta修season.nfo");
         fixSeasonBtn.addActionListener(e -> fixSeasonNfo());
         btnPanel.add(fixSeasonBtn);
+        JButton vsCleanBtn = new JButton("VS无效视频清理");
+        vsCleanBtn.addActionListener(e -> openVSCleanup());
+        btnPanel.add(vsCleanBtn);
+        JButton vsUnregScanBtn = new JButton("VS未注册视频扫描");
+        vsUnregScanBtn.addActionListener(e -> openVSUnregisteredScan());
+        btnPanel.add(vsUnregScanBtn);
         panel.add(btnPanel, BorderLayout.NORTH);
         return panel;
     }
@@ -1249,6 +1264,39 @@ public class MainStage {
         dialog.setVisible(true);
     }
 
+    private DsmApiClient dsmClient;
+
+    private DsmApiClient getDsmClient() {
+        if (dsmClient != null) return dsmClient;
+        Map<String, String> props = configService.gets(Arrays.asList("dsmAddr", "dsmAccount", "dsmPasswd"));
+        String addr = props.getOrDefault("dsmAddr", "").trim();
+        String account = props.getOrDefault("dsmAccount", "").trim();
+        String passwd = props.getOrDefault("dsmPasswd", "").trim();
+        if (addr.isEmpty() || account.isEmpty() || passwd.isEmpty()) return null;
+        dsmClient = new DsmApiClient(addr, account, passwd);
+        return dsmClient;
+    }
+
+    private void openVSCleanup() {
+        DsmApiClient client = getDsmClient();
+        if (client == null) {
+            JOptionPane.showMessageDialog(frame, "请先在系统设置中填写 DSM 地址、账号和密码", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        VSCleanupDialog dialog = new VSCleanupDialog(frame, client);
+        dialog.setVisible(true);
+    }
+
+    private void openVSUnregisteredScan() {
+        DsmApiClient client = getDsmClient();
+        if (client == null) {
+            JOptionPane.showMessageDialog(frame, "请先在系统设置中填写 DSM 地址、账号和密码", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        VSUnregisteredScanDialog dialog = new VSUnregisteredScanDialog(frame, client, configService);
+        dialog.setVisible(true);
+    }
+
     private void openFilePicker() {
         File initialDir = resolveInitialDir(getTargetPath());
         FilePickerDialog dialog = new FilePickerDialog(frame, initialDir);
@@ -1342,6 +1390,9 @@ public class MainStage {
         originalAvailableTf.setEnabled(enabled);
         doubanMaxLimitTf.setEnabled(enabled);
         baikeBaiduMaxLimitTf.setEnabled(enabled);
+        dsmAddrTf.setEnabled(enabled);
+        dsmAccountTf.setEnabled(enabled);
+        dsmPasswdTf.setEnabled(enabled);
         cleanCacheBtn.setEnabled(enabled);
         doubanLoginBtn.setEnabled(enabled);
         for (JButton btn : settingButtons) btn.setEnabled(enabled);
@@ -1546,6 +1597,9 @@ public class MainStage {
             setIfNotNull(originalAvailableTf, props.get("originalAvailable"));
             setIfNotNull(doubanMaxLimitTf, props.get("doubanMaxLimit"));
             setIfNotNull(baikeBaiduMaxLimitTf, props.get("baikeBaiduMaxLimit"));
+            setIfNotNull(dsmAddrTf, props.get("dsmAddr"));
+            setIfNotNull(dsmAccountTf, props.get("dsmAccount"));
+            setIfNotNull(dsmPasswdTf, props.get("dsmPasswd"));
         } catch (Exception e) {
             statusLb.setText("加载设置失败: " + e.getMessage());
         }
@@ -1571,6 +1625,9 @@ public class MainStage {
         case "强制发布日期": return "originalAvailable";
         case "豆瓣结果条数": return "doubanMaxLimit";
         case "百度百科结果条数": return "baikeBaiduMaxLimit";
+        case "DSM地址": return "dsmAddr";
+        case "DSM账号": return "dsmAccount";
+        case "DSM密码": return "dsmPasswd";
         default: return "";
         }
     }

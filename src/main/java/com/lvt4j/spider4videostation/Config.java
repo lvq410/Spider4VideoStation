@@ -63,6 +63,12 @@ public class Config {
     private String baikeBaiduSearchUrl;
 //    private long baikeBaiduTimeoutMillis;
     private int baikeBaiduMaxLimit;
+
+    private String dsmAddr;
+    private String dsmAccount;
+    private String dsmPasswd;
+
+    private String vsUnregisteredScanTempFolder;
     
     public Integer fileEpIdx2SiteEpIdx(Integer fileEpIdx) {
         if(fileEpIdx==null) return null;

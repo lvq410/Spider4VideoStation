@@ -8,9 +8,13 @@ import static java.util.Collections.emptyList;
 import static java.util.stream.Collectors.joining;
 
 import java.io.File;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -96,7 +100,17 @@ public class BaikeBaiduService implements SpiderService {
         driver = drivers.driver(Name, Type.Searcher);
         driver.optionsCustom(opts->{
             opts.setPageLoadStrategy(PageLoadStrategy.NORMAL);
-            opts.addExtensions(new File("ChromeExtensions/XHRInterceptorExtension.crx"));
+            try {
+                Path tmp = Files.createTempFile("XHRInterceptorExtension", ".crx");
+                tmp.toFile().deleteOnExit();
+                try (InputStream in = getClass().getClassLoader()
+                        .getResourceAsStream("ChromeExtensions/XHRInterceptorExtension.crx")) {
+                    Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
+                }
+                opts.addExtensions(tmp.toFile());
+            } catch (Exception e) {
+                throw new RuntimeException("加载 Chrome 插件失败", e);
+            }
         });
     }
     

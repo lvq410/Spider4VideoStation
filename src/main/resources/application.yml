@@ -71,3 +71,10 @@ baikeBaiduOrigin: https://${baikeBaiduDomain}
 baikeBaiduSearchUrl: https://${baikeBaiduDomain}/search?pn=0&rn=0&enc=utf8
 baikeBaiduTimeoutMillis: 60000
 baikeBaiduMaxLimit: 4
+
+dsmAddr: ""
+dsmAccount: ""
+dsmPasswd: ""
+
+vsUnregisteredScanTempFolder: ""
+recentTargets: ""
