@@ -59,6 +59,10 @@ public class ConfigService {
             String recentTargets = System.getProperty("recentTargets");
             if (recentTargets == null) recentTargets = env.getProperty("recentTargets");
             if (recentTargets != null) sb.append("recentTargets: '").append(recentTargets.replace("'", "''")).append("'\n");
+            // 最近DSM路径
+            String recentDsmPaths = System.getProperty("recentDsmPaths");
+            if (recentDsmPaths == null) recentDsmPaths = env.getProperty("recentDsmPaths");
+            if (recentDsmPaths != null) sb.append("recentDsmPaths: '").append(recentDsmPaths.replace("'", "''")).append("'\n");
             try (OutputStreamWriter w = new OutputStreamWriter(
                     new FileOutputStream(LocalConfigFile), StandardCharsets.UTF_8)) {
                 w.write(sb.toString());

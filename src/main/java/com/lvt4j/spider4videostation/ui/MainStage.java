@@ -5,6 +5,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Graphics;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Image;
@@ -18,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 import javax.imageio.ImageIO;
+import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
@@ -36,7 +38,9 @@ import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingWorker;
+import javax.swing.UIManager;
 import javax.swing.WindowConstants;
+import javax.swing.BorderFactory;
 import javax.swing.border.EmptyBorder;
 import javax.swing.border.TitledBorder;
 
@@ -355,20 +359,86 @@ public class MainStage {
     private JPanel buildToolsPanel() {
         JPanel panel = new JPanel(new BorderLayout());
         panel.setBorder(new TitledBorder("工具"));
-        JPanel btnPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 3)) {
+
+        JPanel contentPanel = new JPanel();
+        contentPanel.setLayout(new BoxLayout(contentPanel, BoxLayout.Y_AXIS));
+
+        // 通用工具行（FlowLayout自动换行，getPreferredSize计算实际高度）
+        JPanel row1 = createFlowRow();
+        metaViewerBtn = new JButton("查看元数据文件");
+        metaViewerBtn.addActionListener(e -> openMetaViewer());
+        row1.add(metaViewerBtn);
+        JButton vsmeta2NfoBtn = new JButton("vsmeta转nfo");
+        vsmeta2NfoBtn.addActionListener(e -> vsmetaToNfo());
+        row1.add(vsmeta2NfoBtn);
+        JButton delNfoBtn = new JButton("递归删除nfo");
+        delNfoBtn.addActionListener(e -> deleteNfo());
+        row1.add(delNfoBtn);
+        JButton fixSeasonBtn = new JButton("vsmeta修season.nfo");
+        fixSeasonBtn.addActionListener(e -> fixSeasonNfo());
+        row1.add(fixSeasonBtn);
+
+        // VS整理 分隔线（横线穿过文字中部，颜色与TitledBorder一致）
+        JPanel sepPanel = new JPanel() {
             @Override
-            public java.awt.Dimension getPreferredSize() {
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                int midY = getHeight() / 2;
+                Color lineColor = UIManager.getColor("TitledBorder.titleColor");
+                if (lineColor == null) lineColor = Color.GRAY;
+                g.setColor(lineColor);
+                g.drawLine(0, midY, getWidth(), midY);
+            }
+        };
+        sepPanel.setLayout(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        JLabel vsSepLabel = new JLabel("VS整理");
+        vsSepLabel.setFont(vsSepLabel.getFont().deriveFont(Font.BOLD));
+        vsSepLabel.setOpaque(true);
+        vsSepLabel.setBackground(sepPanel.getBackground());
+        vsSepLabel.setBorder(BorderFactory.createEmptyBorder(2, 2, 2, 5));
+        sepPanel.add(vsSepLabel);
+
+        // VS工具行
+        JPanel row2 = createFlowRow();
+        JButton vsCleanBtn = new JButton("VS无效视频清理");
+        vsCleanBtn.addActionListener(e -> openVSCleanup());
+        row2.add(vsCleanBtn);
+        JButton vsUnregScanBtn = new JButton("VS未注册视频扫描");
+        vsUnregScanBtn.addActionListener(e -> openVSUnregisteredScan());
+        row2.add(vsUnregScanBtn);
+        JButton vsMetaCompleteBtn = new JButton("VS追加剧集meta补全");
+        vsMetaCompleteBtn.addActionListener(e -> openVSmetaCompleter());
+        row2.add(vsMetaCompleteBtn);
+        JButton vsThumbRefreshBtn = new JButton("VS剧集缩略图重刷");
+        vsThumbRefreshBtn.addActionListener(e -> openVSThumbRefresh());
+        row2.add(vsThumbRefreshBtn);
+
+        contentPanel.add(row1);
+        contentPanel.add(sepPanel);
+        contentPanel.add(row2);
+
+        panel.add(contentPanel, BorderLayout.NORTH);
+        return panel;
+    }
+
+    /** 创建支持自动换行的高度自适应FlowLayout面板 */
+    private JPanel createFlowRow() {
+        return new JPanel(new FlowLayout(FlowLayout.LEFT, 5, 3)) {
+            @Override
+            public Dimension getPreferredSize() {
                 int w = getParent() != null ? getParent().getWidth() : 450;
                 if (w <= 0) w = 450;
                 FlowLayout fl = (FlowLayout) getLayout();
                 int hgap = fl.getHgap();
                 int vgap = fl.getVgap();
-                java.awt.Insets ins = getInsets();
+                Insets ins = getInsets();
+                if (ins == null) ins = new Insets(0, 0, 0, 0);
                 int innerW = w - ins.left - ins.right;
                 int x = 0, rowH = 0;
                 java.util.List<Integer> rowHeights = new java.util.ArrayList<>();
                 for (int i = 0, n = getComponentCount(); i < n; i++) {
-                    java.awt.Dimension d = getComponent(i).getPreferredSize();
+                    Dimension d = getComponent(i).getPreferredSize();
+                    if (d == null) continue;
                     if (x > 0 && x + d.width + hgap > innerW) {
                         rowHeights.add(rowH);
                         x = 0; rowH = 0;
@@ -380,29 +450,9 @@ public class MainStage {
                 int h = ins.top + ins.bottom;
                 for (int rh : rowHeights) h += rh;
                 if (rowHeights.size() > 1) h += (rowHeights.size() - 1) * vgap;
-                return new java.awt.Dimension(innerW, h + 4);
+                return new Dimension(innerW, h + 4);
             }
         };
-        metaViewerBtn = new JButton("查看元数据文件");
-        metaViewerBtn.addActionListener(e -> openMetaViewer());
-        btnPanel.add(metaViewerBtn);
-        JButton vsmeta2NfoBtn = new JButton("vsmeta转nfo");
-        vsmeta2NfoBtn.addActionListener(e -> vsmetaToNfo());
-        btnPanel.add(vsmeta2NfoBtn);
-        JButton delNfoBtn = new JButton("递归删除nfo");
-        delNfoBtn.addActionListener(e -> deleteNfo());
-        btnPanel.add(delNfoBtn);
-        JButton fixSeasonBtn = new JButton("vsmeta修season.nfo");
-        fixSeasonBtn.addActionListener(e -> fixSeasonNfo());
-        btnPanel.add(fixSeasonBtn);
-        JButton vsCleanBtn = new JButton("VS无效视频清理");
-        vsCleanBtn.addActionListener(e -> openVSCleanup());
-        btnPanel.add(vsCleanBtn);
-        JButton vsUnregScanBtn = new JButton("VS未注册视频扫描");
-        vsUnregScanBtn.addActionListener(e -> openVSUnregisteredScan());
-        btnPanel.add(vsUnregScanBtn);
-        panel.add(btnPanel, BorderLayout.NORTH);
-        return panel;
     }
 
     private void vsmetaToNfo() {
@@ -1294,6 +1344,36 @@ public class MainStage {
             return;
         }
         VSUnregisteredScanDialog dialog = new VSUnregisteredScanDialog(frame, client, configService);
+        dialog.setVisible(true);
+    }
+
+    private void openVSmetaCompleter() {
+        String targetPath = getTargetPath();
+        if (targetPath.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "请先在主界面选择抓取目标", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        DsmApiClient client = getDsmClient();
+        if (client == null) {
+            JOptionPane.showMessageDialog(frame, "请先在系统设置中填写 DSM 地址、账号和密码", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        VSmetaCompleterDialog dialog = new VSmetaCompleterDialog(frame, client, configService, targetPath);
+        dialog.setVisible(true);
+    }
+
+    private void openVSThumbRefresh() {
+        String targetPath = getTargetPath();
+        if (targetPath.isEmpty()) {
+            JOptionPane.showMessageDialog(frame, "请先在主界面选择抓取目标", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        DsmApiClient client = getDsmClient();
+        if (client == null) {
+            JOptionPane.showMessageDialog(frame, "请先在系统设置中填写 DSM 地址、账号和密码", "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        VSThumbRefreshDialog dialog = new VSThumbRefreshDialog(frame, client, configService, targetPath);
         dialog.setVisible(true);
     }
 
