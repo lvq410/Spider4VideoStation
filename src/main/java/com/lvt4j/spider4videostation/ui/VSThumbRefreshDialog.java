@@ -331,6 +331,14 @@ public class VSThumbRefreshDialog extends JDialog {
 
             // 最后分析本目录
             filterDirResults(dir.getAbsolutePath(), dirItems);
+            // 清理非结果的缓存
+            cleanupMetaCache();
+        }
+
+        private void cleanupMetaCache() {
+            Set<File> keep = new HashSet<>();
+            for (VSmetaFileItem item : results) keep.add(item.vsmetaFile);
+            metaCache.keySet().removeIf(k -> !keep.contains(k));
         }
 
         /** 根据当前模式，对本目录的条目做筛选并加入results */

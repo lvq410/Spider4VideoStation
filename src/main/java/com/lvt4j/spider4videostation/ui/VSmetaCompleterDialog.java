@@ -319,6 +319,24 @@ public class VSmetaCompleterDialog extends JDialog {
             if (!videoFiles.isEmpty()) {
                 analyzeVideos(localDir, videoFiles, fileNames, results);
             }
+            // 清理本目录非结果非模板的缓存，释放内存
+            cleanupMetaCache(results);
+        }
+
+        private void cleanupMetaCache(List<IncompleteEpisode> results) {
+            Set<File> keep = new HashSet<>();
+            for (IncompleteEpisode ie : results) {
+                if (ie.vsmetaFile != null) keep.add(ie.vsmetaFile);
+            }
+            for (Optional<VSmeta> opt : templateCache.values()) {
+                // 模板的VSmeta对象已缓存，但其文件引用需从metaCache反查
+                opt.ifPresent(t -> {
+                    for (Map.Entry<File, VSmeta> e : metaCache.entrySet()) {
+                        if (e.getValue() == t) { keep.add(e.getKey()); break; }
+                    }
+                });
+            }
+            metaCache.keySet().removeIf(k -> !keep.contains(k));
         }
 
         /** 分析一个目录下的视频文件，找出待补全的 */
