@@ -33,6 +33,7 @@ public class FilePickerDialog extends JDialog {
     private File currentDir;
     private File selectedPath;
     private DialogResult result;
+    private boolean folderOnly;
 
     private Stack<File> backStack = new Stack<>();
     private Stack<File> forwardStack = new Stack<>();
@@ -45,8 +46,14 @@ public class FilePickerDialog extends JDialog {
     private JButton forwardBtn;
 
     public FilePickerDialog(Frame owner, File initialDir) {
-        super(owner, "选择文件或文件夹", true);
+        this(owner, initialDir, false);
+    }
+
+    public FilePickerDialog(Frame owner, File initialDir, boolean folderOnly) {
+        super(owner, folderOnly ? "选择文件夹" : "选择文件或文件夹", true);
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
+
+        this.folderOnly = folderOnly;
 
         this.currentDir = initialDir.isDirectory() ? initialDir : initialDir.getParentFile();
         if (currentDir == null) currentDir = new File("E:\\Downloads");
@@ -92,7 +99,7 @@ public class FilePickerDialog extends JDialog {
                     File f = fileEntries.get(idx);
                     if (f.isDirectory()) {
                         enterDir(f);
-                    } else {
+                    } else if (!folderOnly) {
                         selectedPath = f;
                         closeWithResult();
                     }
@@ -104,7 +111,7 @@ public class FilePickerDialog extends JDialog {
 
         // 底部确认按钮
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 5));
-        JButton confirmBtn = new JButton("确认");
+        JButton confirmBtn = new JButton(folderOnly ? "选择此文件夹" : "确认");
         confirmBtn.addActionListener(e -> {
             if (selectedPath == null) selectedPath = currentDir;
             closeWithResult();
@@ -181,8 +188,9 @@ public class FilePickerDialog extends JDialog {
                 if (f.isHidden()) continue;
                 if (f.isDirectory()) {
                     if (f.getName().startsWith(".")) continue;
-                } else if (!FUtils.isVideoFile(f)) {
-                    continue;
+                } else {
+                    if (folderOnly) continue;
+                    if (!FUtils.isVideoFile(f)) continue;
                 }
                 fileEntries.add(f);
                 listModel.addElement(f.isDirectory() ? f.getName() : formatSize(f.length()) + " | " + f.getName());

@@ -8,9 +8,17 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
@@ -23,7 +31,6 @@ import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingWorker;
 import javax.swing.WindowConstants;
@@ -40,26 +47,25 @@ import com.lvt4j.spider4videostation.ffmpeg.MediaInfo;
 import com.lvt4j.spider4videostation.metadata.FUtils;
 import com.lvt4j.spider4videostation.metadata.VSmeta;
 import com.lvt4j.spider4videostation.service.ConfigService;
-import com.lvt4j.spider4videostation.service.DsmApiClient;
 
 /**
- * VS剧集缩略图重刷对话框——扫描目标文件夹下所有有效剧集vsmeta，
- * 用ffmpeg重新生成缩略图覆盖，并通过DSM移出移入触发VS刷新
+ * VS剧集缩略图重刷对话框——扫描目标文件夹下剧集vsmeta，用ffmpeg重新生成缩略图覆盖
  *
  * @author LV on 2024年6月1日
  */
 public class VSThumbRefreshDialog extends JDialog {
 
-    private final DsmApiClient client;
+    private static final String[] MODES = {"仅无缩略图", "重复缩略图", "无+重复", "全部重刷"};
+
     private final ConfigService configService;
-    private final String targetPath;
-    private final File targetDir;
+    private File targetDir;
 
     // Phase 1
-    private JTextField targetTf;
-    private DefaultComboBoxModel<String> dsmPathModel;
-    private JComboBox<String> dsmPathCb;
-    private JTextField tempFolderTf;
+    private DefaultComboBoxModel<String> targetPathModel;
+    private JComboBox<String> targetPathCb;
+    private DefaultComboBoxModel<String> tempPathModel;
+    private JComboBox<String> tempPathCb;
+    private JComboBox<String> modeCb;
     private JButton scanBtn;
 
     // Phase 2
@@ -78,14 +84,12 @@ public class VSThumbRefreshDialog extends JDialog {
     private JPanel topPanel;
 
     private List<VSmetaFileItem> scanResults;
+    /** vsmeta文件缓存，key=vsmetaFile，扫描时填充避免重复读取 */
+    private final Map<File, VSmeta> metaCache = new HashMap<>();
 
-    public VSThumbRefreshDialog(Frame owner, DsmApiClient client,
-            ConfigService configService, String targetPath) {
+    public VSThumbRefreshDialog(Frame owner, ConfigService configService, String initialTargetPath) {
         super(owner, "VS剧集缩略图重刷", true);
-        this.client = client;
         this.configService = configService;
-        this.targetPath = targetPath;
-        this.targetDir = new File(targetPath);
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
         setSize(950, 680);
         setLocationRelativeTo(owner);
@@ -94,7 +98,7 @@ public class VSThumbRefreshDialog extends JDialog {
         rootPanel.setBorder(new EmptyBorder(8, 8, 8, 8));
 
         topPanel = new JPanel(new BorderLayout(5, 5));
-        topPanel.add(buildPhase1Panel(), BorderLayout.CENTER);
+        topPanel.add(buildPhase1Panel(initialTargetPath), BorderLayout.CENTER);
         rootPanel.add(topPanel, BorderLayout.NORTH);
 
         centerPanel = new JPanel(new BorderLayout());
@@ -105,7 +109,7 @@ public class VSThumbRefreshDialog extends JDialog {
 
     // ==================== Phase 1 ====================
 
-    private JPanel buildPhase1Panel() {
+    private JPanel buildPhase1Panel(String initialTargetPath) {
         JPanel panel = new JPanel(new GridBagLayout());
         panel.setBorder(new TitledBorder("参数设置"));
         GridBagConstraints gbc = new GridBagConstraints();
@@ -113,39 +117,57 @@ public class VSThumbRefreshDialog extends JDialog {
         gbc.anchor = GridBagConstraints.WEST;
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
+        // 目标文件夹
         gbc.gridx = 0; gbc.gridy = 0;
         gbc.weightx = 0;
         panel.add(new JLabel("目标文件夹:"), gbc);
+        JPanel targetPanel = new JPanel(new BorderLayout(5, 0));
+        targetPathModel = new DefaultComboBoxModel<>();
+        loadRecentPaths("recentThumbTargets", targetPathModel);
+        if (initialTargetPath != null && !initialTargetPath.isEmpty()) {
+            for (int i = 0; i < targetPathModel.getSize(); i++) {
+                if (initialTargetPath.equals(targetPathModel.getElementAt(i))) {
+                    targetPathModel.removeElementAt(i); break;
+                }
+            }
+            targetPathModel.insertElementAt(initialTargetPath, 0);
+        }
+        targetPathCb = new JComboBox<>(targetPathModel);
+        targetPathCb.setEditable(true);
+        targetPathCb.setSelectedItem(initialTargetPath);
+        targetPanel.add(targetPathCb, BorderLayout.CENTER);
+        JButton targetBrowseBtn = new JButton("...");
+        targetBrowseBtn.addActionListener(e -> browseFolder("recentThumbTargets", targetPathModel, targetPathCb));
+        targetPanel.add(targetBrowseBtn, BorderLayout.EAST);
         gbc.gridx = 1; gbc.weightx = 1.0;
-        targetTf = new JTextField(targetPath);
-        targetTf.setEditable(false);
-        targetTf.setEnabled(false);
-        panel.add(targetTf, gbc);
+        panel.add(targetPanel, gbc);
 
+        // 中转文件夹
         gbc.gridx = 0; gbc.gridy = 1;
         gbc.weightx = 0;
-        panel.add(new JLabel("对应DSM路径:"), gbc);
-        JPanel dsmPathPanel = new JPanel(new BorderLayout(5, 0));
-        dsmPathModel = new DefaultComboBoxModel<>();
-        loadRecentDsmPaths();
-        dsmPathCb = new JComboBox<>(dsmPathModel);
-        dsmPathCb.setEditable(true);
-        dsmPathPanel.add(dsmPathCb, BorderLayout.CENTER);
-        JButton browseBtn = new JButton("...");
-        browseBtn.addActionListener(e -> browseDsmFolder());
-        dsmPathPanel.add(browseBtn, BorderLayout.EAST);
+        panel.add(new JLabel("中转文件夹:"), gbc);
+        JPanel tempPanel = new JPanel(new BorderLayout(5, 0));
+        tempPathModel = new DefaultComboBoxModel<>();
+        loadRecentPaths("recentThumbTempFolders", tempPathModel);
+        tempPathCb = new JComboBox<>(tempPathModel);
+        tempPathCb.setEditable(true);
+        tempPanel.add(tempPathCb, BorderLayout.CENTER);
+        JButton tempBrowseBtn = new JButton("...");
+        tempBrowseBtn.addActionListener(e -> browseFolder("recentThumbTempFolders", tempPathModel, tempPathCb));
+        tempPanel.add(tempBrowseBtn, BorderLayout.EAST);
         gbc.gridx = 1; gbc.weightx = 1.0;
-        panel.add(dsmPathPanel, gbc);
+        panel.add(tempPanel, gbc);
 
+        // 扫描模式
         gbc.gridx = 0; gbc.gridy = 2;
         gbc.weightx = 0;
-        panel.add(new JLabel("中转文件夹:"), gbc);
+        panel.add(new JLabel("扫描模式:"), gbc);
         gbc.gridx = 1; gbc.weightx = 1.0;
-        tempFolderTf = new JTextField();
-        String savedTemp = getConfig("vsUnregisteredScanTempFolder");
-        if (savedTemp != null) tempFolderTf.setText(savedTemp);
-        panel.add(tempFolderTf, gbc);
+        modeCb = new JComboBox<>(MODES);
+        modeCb.setSelectedIndex(0);
+        panel.add(modeCb, gbc);
 
+        // 开始扫描
         gbc.gridx = 1; gbc.gridy = 3;
         gbc.weightx = 0;
         gbc.anchor = GridBagConstraints.EAST;
@@ -157,64 +179,83 @@ public class VSThumbRefreshDialog extends JDialog {
         return panel;
     }
 
-    private void loadRecentDsmPaths() {
+    private void loadRecentPaths(String configKey, DefaultComboBoxModel<String> model) {
         try {
-            String json = getConfig("recentDsmPaths");
+            String json = getConfig(configKey);
             if (json == null || json.isEmpty()) return;
             ArrayNode arr = (ArrayNode) Utils.ObjectMapper.readTree(json);
-            for (JsonNode item : arr) dsmPathModel.addElement(item.asText());
+            Set<String> seen = new HashSet<>();
+            for (JsonNode item : arr) {
+                String path = item.asText();
+                if (seen.add(path)) model.addElement(path);
+            }
         } catch (Exception ignored) {}
     }
 
-    private void saveRecentDsmPath(String path) {
-        for (int i = 0; i < dsmPathModel.getSize(); i++) {
-            if (path.equals(dsmPathModel.getElementAt(i))) {
-                dsmPathModel.removeElementAt(i);
-                break;
-            }
+    private void saveRecentPath(String configKey, DefaultComboBoxModel<String> model,
+            JComboBox<String> cb, String path) {
+        for (int i = 0; i < model.getSize(); i++) {
+            if (path.equals(model.getElementAt(i))) { model.removeElementAt(i); break; }
         }
-        dsmPathModel.insertElementAt(path, 0);
-        dsmPathCb.setSelectedItem(path);
-        while (dsmPathModel.getSize() > 10)
-            dsmPathModel.removeElementAt(dsmPathModel.getSize() - 1);
+        model.insertElementAt(path, 0);
+        cb.setSelectedItem(path);
+        while (model.getSize() > 10) model.removeElementAt(model.getSize() - 1);
         try {
             ArrayNode arr = Utils.ObjectMapper.createArrayNode();
-            for (int i = 0; i < dsmPathModel.getSize(); i++)
-                arr.add(dsmPathModel.getElementAt(i));
-            configService.set("recentDsmPaths", Utils.ObjectMapper.writeValueAsString(arr));
+            for (int i = 0; i < model.getSize(); i++) arr.add(model.getElementAt(i));
+            configService.set(configKey, Utils.ObjectMapper.writeValueAsString(arr));
         } catch (Exception ignored) {}
     }
 
-    private void browseDsmFolder() {
-        DSMFolderPickerDialog picker = new DSMFolderPickerDialog(
-            (Frame) getOwner(), client, getDsmPath());
+    private void browseFolder(String configKey, DefaultComboBoxModel<String> model,
+            JComboBox<String> cb) {
+        String initialPath = cb.getSelectedItem() != null ? cb.getSelectedItem().toString().trim() : "";
+        File initialDir = !initialPath.isEmpty() ? new File(initialPath) : new File("N:\\");
+        FilePickerDialog picker = new FilePickerDialog((Frame) getOwner(), initialDir, true);
         picker.setVisible(true);
-        String path = picker.getSelectedPath();
-        if (path != null && !path.isEmpty()) {
-            dsmPathCb.setSelectedItem(path);
-            saveRecentDsmPath(path);
+        FilePickerDialog.DialogResult result = picker.getResult();
+        if (result != null && result.path != null && !result.path.isEmpty()) {
+            saveRecentPath(configKey, model, cb, result.path);
         }
     }
 
     // ==================== Phase 2: 扫描 ====================
 
     private void startScan() {
-        String dsmPath = getDsmPath();
-        String tempFolder = tempFolderTf.getText().trim();
-        if (dsmPath.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "请选择或输入对应DSM路径", "提示", JOptionPane.WARNING_MESSAGE);
+        String targetPath = getTargetPath();
+        String tempPath = getTempPath();
+        if (targetPath.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "请选择目标文件夹", "提示", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        if (tempFolder.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "请输入中转文件夹路径", "提示", JOptionPane.WARNING_MESSAGE);
+        if (tempPath.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "请选择中转文件夹", "提示", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        try { configService.set("vsUnregisteredScanTempFolder", tempFolder); } catch (Exception ignored) {}
-        saveRecentDsmPath(dsmPath);
+        targetDir = new File(targetPath);
+        if (!targetDir.isDirectory()) {
+            JOptionPane.showMessageDialog(this, "目标文件夹不存在: " + targetPath, "错误", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        File tempDir = new File(tempPath);
+        Path p1 = targetDir.toPath().toAbsolutePath().normalize();
+        Path p2 = tempDir.toPath().toAbsolutePath().normalize();
+        if (p1.getNameCount() < 1 || p2.getNameCount() < 1
+                || !p1.getName(0).equals(p2.getName(0))) {
+            JOptionPane.showMessageDialog(this,
+                "目标文件夹和中转文件夹必须在同一一级目录下\n目标: " + p1 + "\n中转: " + p2,
+                "提示", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        saveRecentPath("recentThumbTargets", targetPathModel, targetPathCb, targetPath);
+        saveRecentPath("recentThumbTempFolders", tempPathModel, tempPathCb, tempPath);
+        metaCache.clear();
 
         scanBtn.setEnabled(false);
-        dsmPathCb.setEnabled(false);
-        tempFolderTf.setEnabled(false);
+        targetPathCb.setEnabled(false);
+        tempPathCb.setEnabled(false);
+        modeCb.setEnabled(false);
 
         centerPanel.removeAll();
         JPanel scanPanel = new JPanel(new BorderLayout(5, 5));
@@ -235,39 +276,99 @@ public class VSThumbRefreshDialog extends JDialog {
 
     private class ScanWorker extends SwingWorker<List<VSmetaFileItem>, String> {
 
+        private final List<VSmetaFileItem> results = new ArrayList<>();
+        private int mode;
+
         @Override
         protected List<VSmetaFileItem> doInBackground() throws Exception {
-            List<VSmetaFileItem> results = new ArrayList<>();
-            List<File> vsmetaFiles = new ArrayList<>();
-            collectVsmetaFiles(targetDir, vsmetaFiles);
-            int total = vsmetaFiles.size();
-            int checked = 0;
-
-            for (File vf : vsmetaFiles) {
-                checked++;
-                // 检查对应视频文件是否存在
-                String name = vf.getName();
-                String videoName = name.endsWith(".vsmeta")
-                    ? name.substring(0, name.length() - 7) : name;
-                File videoFile = new File(vf.getParentFile(), videoName);
-                if (!videoFile.exists() || !FUtils.isVideoFile(videoFile)) continue;
-
-                // 检查是否为剧集类型
-                try {
-                    VSmeta meta = new VSmeta(vf);
-                    if (meta.type != VSmeta.TypeEpisode) continue;
-                } catch (Exception e) {
-                    continue; // 解析失败跳过
-                }
-
-                VSmetaFileItem item = new VSmetaFileItem();
-                item.vsmetaFile = vf;
-                item.videoFile = videoFile;
-                results.add(item);
-
-                publish("正在扫描... 已检查 " + checked + "/" + total + "，发现 " + results.size() + " 个剧集vsmeta");
-            }
+            mode = modeCb.getSelectedIndex();
+            analyzeDir(targetDir);
             return results;
+        }
+
+        /** 深度优先遍历：先子目录，再加载本目录vsmeta并分析 */
+        private void analyzeDir(File dir) {
+            publish("正在分析 " + dir.getAbsolutePath());
+            
+            File[] entries = dir.listFiles();
+            if (entries == null) return;
+            Set<String> fileNames = new HashSet<>();
+            List<File> subDirs = new ArrayList<>();
+            int vsmetaCount = 0;
+            for (File f : entries) {
+                fileNames.add(f.getName());
+                if (f.isDirectory()) subDirs.add(f);
+                else if (f.getName().endsWith(".vsmeta")) vsmetaCount++;
+            }
+
+            // 先递归子目录
+            subDirs.sort((a, b) -> a.getName().compareToIgnoreCase(b.getName()));
+            for (File sub : subDirs) {
+                analyzeDir(sub);
+            }
+
+            // 再加载本目录vsmeta
+            List<VSmetaFileItem> dirItems = new ArrayList<>();
+            int loaded = 0;
+            for (File f : entries) {
+                if (!f.getName().endsWith(".vsmeta")) continue;
+                loaded++;
+                publish("正在分析 " + dir.getAbsolutePath() + " (" + loaded + "/" + vsmetaCount + ")");
+                String videoName = f.getName().substring(0, f.getName().length() - 7);
+                if (!fileNames.contains(videoName)) continue;
+                if (!FUtils.isVideoFile(videoName)) continue;
+                try {
+                    VSmeta meta = new VSmeta(f);
+                    metaCache.put(f, meta);
+                    if (meta.type == VSmeta.TypeEpisode) {
+                        VSmetaFileItem item = new VSmetaFileItem();
+                        item.vsmetaFile = f;
+                        item.videoFile = new File(dir, videoName);
+                        dirItems.add(item);
+                    }
+                } catch (Exception ignored) {}
+            }
+
+            // 最后分析本目录
+            filterDirResults(dir.getAbsolutePath(), dirItems);
+        }
+
+        /** 根据当前模式，对本目录的条目做筛选并加入results */
+        private void filterDirResults(String dirKey, List<VSmetaFileItem> dirItems) {
+            if (dirItems.isEmpty()) return;
+            if (mode == 3) { results.addAll(dirItems); return; }
+
+            if (mode == 0 || mode == 2) {
+                // 仅无缩略图 / 无+重复
+                for (VSmetaFileItem item : dirItems) {
+                    VSmeta meta = metaCache.get(item.vsmetaFile);
+                    if (meta != null && (meta.episodeThumbData == null || meta.episodeThumbData.isEmpty())) {
+                        results.add(item);
+                    }
+                }
+            }
+            if (mode == 1 || mode == 2) {
+                // 重复缩略图：同目录下MD5相同的全部加入
+                Set<String> alreadyAdded = new HashSet<>();
+                for (VSmetaFileItem r : results) alreadyAdded.add(r.vsmetaFile.getAbsolutePath());
+                Map<String, List<VSmetaFileItem>> md5Groups = new HashMap<>();
+                for (VSmetaFileItem item : dirItems) {
+                    VSmeta meta = metaCache.get(item.vsmetaFile);
+                    if (meta == null) continue;
+                    String md5 = meta.episodeThumbMd5 != null ? meta.episodeThumbMd5 : "";
+                    if (md5.isEmpty()) continue;
+                    md5Groups.computeIfAbsent(md5, k -> new ArrayList<>()).add(item);
+                }
+                for (List<VSmetaFileItem> dupGroup : md5Groups.values()) {
+                    if (dupGroup.size() >= 2) {
+                        for (VSmetaFileItem item : dupGroup) {
+                            if (alreadyAdded.add(item.vsmetaFile.getAbsolutePath())) {
+                                results.add(item);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         @Override
@@ -284,12 +385,13 @@ public class VSThumbRefreshDialog extends JDialog {
                     .compareToIgnoreCase(b.vsmetaFile.getAbsolutePath()));
                 if (scanResults.isEmpty()) {
                     centerPanel.removeAll();
-                    centerPanel.add(new JLabel("目标文件夹下未找到有效的剧集vsmeta文件", JLabel.CENTER));
+                    centerPanel.add(new JLabel("未找到符合条件的剧集vsmeta", JLabel.CENTER));
                     centerPanel.revalidate();
                     centerPanel.repaint();
                     scanBtn.setEnabled(true);
-                    dsmPathCb.setEnabled(true);
-                    tempFolderTf.setEnabled(true);
+                    targetPathCb.setEnabled(true);
+                    tempPathCb.setEnabled(true);
+                    modeCb.setEnabled(true);
                 } else {
                     showResultTable();
                 }
@@ -297,20 +399,9 @@ public class VSThumbRefreshDialog extends JDialog {
                 JOptionPane.showMessageDialog(VSThumbRefreshDialog.this,
                     "扫描失败: " + e.getMessage(), "错误", JOptionPane.ERROR_MESSAGE);
                 scanBtn.setEnabled(true);
-                dsmPathCb.setEnabled(true);
-                tempFolderTf.setEnabled(true);
-            }
-        }
-    }
-
-    private void collectVsmetaFiles(File dir, List<File> out) {
-        File[] files = dir.listFiles();
-        if (files == null) return;
-        for (File f : files) {
-            if (f.isDirectory()) {
-                collectVsmetaFiles(f, out);
-            } else if (f.getName().endsWith(".vsmeta")) {
-                out.add(f);
+                targetPathCb.setEnabled(true);
+                tempPathCb.setEnabled(true);
+                modeCb.setEnabled(true);
             }
         }
     }
@@ -322,7 +413,7 @@ public class VSThumbRefreshDialog extends JDialog {
 
         JPanel panel = new JPanel(new BorderLayout(5, 5));
 
-        JLabel infoLb = new JLabel("发现 " + scanResults.size() + " 个有效的剧集vsmeta:");
+        JLabel infoLb = new JLabel("发现 " + scanResults.size() + " 个剧集vsmeta:");
         Font cjk = Spider4VideoStationApp.getCJKFont();
         if (cjk != null) infoLb.setFont(cjk.deriveFont(12f));
         panel.add(infoLb, BorderLayout.NORTH);
@@ -364,8 +455,9 @@ public class VSThumbRefreshDialog extends JDialog {
             centerPanel.revalidate();
             centerPanel.repaint();
             scanBtn.setEnabled(true);
-            dsmPathCb.setEnabled(true);
-            tempFolderTf.setEnabled(true);
+            targetPathCb.setEnabled(true);
+            tempPathCb.setEnabled(true);
+            modeCb.setEnabled(true);
         });
         rescanPanel.add(rescanBtn);
         topPanel.add(rescanPanel, BorderLayout.SOUTH);
@@ -396,17 +488,17 @@ public class VSThumbRefreshDialog extends JDialog {
             return;
         }
 
-        String dsmPath = getDsmPath();
-        String tempFolder = tempFolderTf.getText().trim();
+        String tempPath = getTempPath();
 
         centerPanel.removeAll();
         topPanel.removeAll();
-        topPanel.add(buildPhase1Panel(), BorderLayout.CENTER);
+        topPanel.add(buildPhase1Panel(targetDir.getAbsolutePath()), BorderLayout.CENTER);
         topPanel.revalidate();
         topPanel.repaint();
         scanBtn.setEnabled(false);
-        dsmPathCb.setEnabled(false);
-        tempFolderTf.setEnabled(false);
+        targetPathCb.setEnabled(false);
+        tempPathCb.setEnabled(false);
+        modeCb.setEnabled(false);
 
         logArea = new JTextArea();
         logArea.setEditable(false);
@@ -428,21 +520,18 @@ public class VSThumbRefreshDialog extends JDialog {
         centerPanel.revalidate();
         centerPanel.repaint();
 
-        new RefreshWorker(selected, dsmPath, tempFolder).execute();
+        new RefreshWorker(selected, tempPath).execute();
     }
 
     private class RefreshWorker extends SwingWorker<Void, String> {
 
         private final List<VSmetaFileItem> items;
-        private final String dsmTargetPath;
         private final String tempFolder;
         private int successCount;
         private int failCount;
 
-        RefreshWorker(List<VSmetaFileItem> items, String dsmTargetPath, String tempFolder) {
+        RefreshWorker(List<VSmetaFileItem> items, String tempFolder) {
             this.items = items;
-            this.dsmTargetPath = dsmTargetPath.endsWith("/")
-                ? dsmTargetPath.substring(0, dsmTargetPath.length() - 1) : dsmTargetPath;
             this.tempFolder = tempFolder;
         }
 
@@ -451,17 +540,13 @@ public class VSThumbRefreshDialog extends JDialog {
             int total = items.size();
             for (int i = 0; i < total; i++) {
                 VSmetaFileItem item = items.get(i);
-                String label = item.videoFile.getName();
-                publish("[" + (i + 1) + "/" + total + "] " + label);
+                publish("[" + (i + 1) + "/" + total + "] " + item.videoFile.getAbsolutePath());
 
                 try {
-                    // 获取视频时长并计算截图位置
-                    publish("  获取视频信息...");
                     MediaInfo mediaInfo = FFmpegUtils.mediaInfo(item.videoFile);
                     long position = (long)(mediaInfo.format.parseDuration() * 0.618);
                     publish("  截图位置: " + FFmpegUtils.formatDuration(position));
 
-                    // 生成缩略图
                     String name = item.videoFile.getName();
                     int dot = name.lastIndexOf('.');
                     String baseName = dot > 0 ? name.substring(0, dot) : name;
@@ -474,7 +559,6 @@ public class VSThumbRefreshDialog extends JDialog {
                         continue;
                     }
 
-                    // 更新vsmeta
                     VSmeta meta = new VSmeta(item.vsmetaFile);
                     meta.episodeThumbData = VSmeta.readImgData(snapshot);
                     meta.episodeThumbMd5 = md5(snapshot);
@@ -482,16 +566,13 @@ public class VSThumbRefreshDialog extends JDialog {
                     snapshot.delete();
                     publish("  缩略图已更新");
 
-                    // 触发VS刷新
-                    String videoDsmPath = dsmTargetPath + "/" + item.videoFile.getName();
-                    publish("  触发VS刷新: " + videoDsmPath);
-                    client.moveFiles(Collections.singletonList(videoDsmPath), tempFolder);
+                    Path src = item.videoFile.toPath();
+                    Path dest = Paths.get(tempFolder, item.videoFile.getName());
+                    publish("  触发VS刷新: " + src + " -> " + dest);
+                    Files.move(src, dest, StandardCopyOption.REPLACE_EXISTING);
                     publish("  移出成功，等待10秒...");
                     Thread.sleep(10000);
-
-                    String movedPath = tempFolder + "/" + item.videoFile.getName();
-                    String originalDir = videoDsmPath.substring(0, videoDsmPath.lastIndexOf('/'));
-                    client.moveFiles(Collections.singletonList(movedPath), originalDir);
+                    Files.move(dest, src, StandardCopyOption.REPLACE_EXISTING);
                     publish("  移回成功，等待10秒...");
                     Thread.sleep(10000);
 
@@ -521,7 +602,6 @@ public class VSThumbRefreshDialog extends JDialog {
         }
     }
 
-    /** 计算文件MD5 */
     private static String md5(File file) {
         try {
             byte[] data = java.nio.file.Files.readAllBytes(file.toPath());
@@ -537,8 +617,13 @@ public class VSThumbRefreshDialog extends JDialog {
 
     // ==================== 工具方法 ====================
 
-    private String getDsmPath() {
-        Object sel = dsmPathCb.getSelectedItem();
+    private String getTargetPath() {
+        Object sel = targetPathCb.getSelectedItem();
+        return sel != null ? sel.toString().trim() : "";
+    }
+
+    private String getTempPath() {
+        Object sel = tempPathCb.getSelectedItem();
         return sel != null ? sel.toString().trim() : "";
     }
 
@@ -570,22 +655,11 @@ public class VSThumbRefreshDialog extends JDialog {
             for (int i = 0; i < data.size(); i++) selected.add(true);
         }
 
-        @Override
-        public int getRowCount() { return data.size(); }
-
-        @Override
-        public int getColumnCount() { return columns.length; }
-
-        @Override
-        public String getColumnName(int col) { return columns[col]; }
-
-        @Override
-        public Class<?> getColumnClass(int col) {
-            return col == 0 ? Boolean.class : String.class;
-        }
-
-        @Override
-        public boolean isCellEditable(int row, int col) { return col == 0; }
+        @Override public int getRowCount() { return data.size(); }
+        @Override public int getColumnCount() { return columns.length; }
+        @Override public String getColumnName(int col) { return columns[col]; }
+        @Override public Class<?> getColumnClass(int col) { return col == 0 ? Boolean.class : String.class; }
+        @Override public boolean isCellEditable(int row, int col) { return col == 0; }
 
         @Override
         public Object getValueAt(int row, int col) {
@@ -599,10 +673,7 @@ public class VSThumbRefreshDialog extends JDialog {
 
         @Override
         public void setValueAt(Object value, int row, int col) {
-            if (col == 0) {
-                selected.set(row, (Boolean) value);
-                fireTableCellUpdated(row, col);
-            }
+            if (col == 0) { selected.set(row, (Boolean) value); fireTableCellUpdated(row, col); }
         }
     }
 }

@@ -63,6 +63,20 @@ public class ConfigService {
             String recentDsmPaths = System.getProperty("recentDsmPaths");
             if (recentDsmPaths == null) recentDsmPaths = env.getProperty("recentDsmPaths");
             if (recentDsmPaths != null) sb.append("recentDsmPaths: '").append(recentDsmPaths.replace("'", "''")).append("'\n");
+            // meta补全历史
+            String recentMetaCompleteTargets = System.getProperty("recentMetaCompleteTargets");
+            if (recentMetaCompleteTargets == null) recentMetaCompleteTargets = env.getProperty("recentMetaCompleteTargets");
+            if (recentMetaCompleteTargets != null) sb.append("recentMetaCompleteTargets: '").append(recentMetaCompleteTargets.replace("'", "''")).append("'\n");
+            String recentMetaCompleteTempFolders = System.getProperty("recentMetaCompleteTempFolders");
+            if (recentMetaCompleteTempFolders == null) recentMetaCompleteTempFolders = env.getProperty("recentMetaCompleteTempFolders");
+            if (recentMetaCompleteTempFolders != null) sb.append("recentMetaCompleteTempFolders: '").append(recentMetaCompleteTempFolders.replace("'", "''")).append("'\n");
+            // 缩略图重刷历史
+            String recentThumbTargets = System.getProperty("recentThumbTargets");
+            if (recentThumbTargets == null) recentThumbTargets = env.getProperty("recentThumbTargets");
+            if (recentThumbTargets != null) sb.append("recentThumbTargets: '").append(recentThumbTargets.replace("'", "''")).append("'\n");
+            String recentThumbTempFolders = System.getProperty("recentThumbTempFolders");
+            if (recentThumbTempFolders == null) recentThumbTempFolders = env.getProperty("recentThumbTempFolders");
+            if (recentThumbTempFolders != null) sb.append("recentThumbTempFolders: '").append(recentThumbTempFolders.replace("'", "''")).append("'\n");
             try (OutputStreamWriter w = new OutputStreamWriter(
                     new FileOutputStream(LocalConfigFile), StandardCharsets.UTF_8)) {
                 w.write(sb.toString());

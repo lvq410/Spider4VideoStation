@@ -1353,12 +1353,7 @@ public class MainStage {
             JOptionPane.showMessageDialog(frame, "请先在主界面选择抓取目标", "提示", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        DsmApiClient client = getDsmClient();
-        if (client == null) {
-            JOptionPane.showMessageDialog(frame, "请先在系统设置中填写 DSM 地址、账号和密码", "提示", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        VSmetaCompleterDialog dialog = new VSmetaCompleterDialog(frame, client, configService, targetPath);
+        VSmetaCompleterDialog dialog = new VSmetaCompleterDialog(frame, configService, targetPath);
         dialog.setVisible(true);
     }
 
@@ -1368,12 +1363,7 @@ public class MainStage {
             JOptionPane.showMessageDialog(frame, "请先在主界面选择抓取目标", "提示", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        DsmApiClient client = getDsmClient();
-        if (client == null) {
-            JOptionPane.showMessageDialog(frame, "请先在系统设置中填写 DSM 地址、账号和密码", "提示", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        VSThumbRefreshDialog dialog = new VSThumbRefreshDialog(frame, client, configService, targetPath);
+        VSThumbRefreshDialog dialog = new VSThumbRefreshDialog(frame, configService, targetPath);
         dialog.setVisible(true);
     }
 

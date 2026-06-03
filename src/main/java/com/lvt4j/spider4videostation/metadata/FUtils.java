@@ -19,7 +19,11 @@ public class FUtils {
     }
 
     public static boolean isVideoFile(File file) {
-        return VideoExts.contains(extension(file.getName()));
+        return isVideoFile(file.getName());
+    }
+
+    public static boolean isVideoFile(String name) {
+        return VideoExts.contains(extension(name));
     }
 
     private static String extension(String name) {
