@@ -116,6 +116,10 @@ public class MetadataGenerator {
                     if (onProgress != null)
                         onProgress.accept(String.format("正在截取视频画面 S%02dE%02d (%d/%d)...", vsmeta.season, vsmeta.episode, index, total));
                     FFmpegUtils.snapshot(target, FFmpegUtils.formatDuration(position), snapshot);
+                    // 超短视频 61.8% 位置可能无帧，用第一帧兜底
+                    if ((!snapshot.exists() || snapshot.length() == 0) && position > 0) {
+                        FFmpegUtils.snapshot(target, "00:00:00.000", snapshot);
+                    }
                     if (snapshot.exists() && snapshot.length() > 0) {
                         vsmeta.episodeThumbData = VSmeta.readImgData(snapshot);
                         vsmeta.episodeThumbMd5 = md5(snapshot);

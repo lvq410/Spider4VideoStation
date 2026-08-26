@@ -472,7 +472,7 @@ public class VSmeta{
         out.write(buf);
     }
     private static void writeString(OutputStream out, String str) throws IOException{
-        writeBuf(out, str.getBytes());
+        writeBuf(out, (str != null ? str : "").getBytes());
     }
 
 

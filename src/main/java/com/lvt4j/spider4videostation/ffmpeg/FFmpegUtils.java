@@ -28,6 +28,7 @@ public class FFmpegUtils {
     private static final Pattern DurationPattern = Pattern.compile("(\\d+):(\\d+):(\\d+)\\.(\\d+)");
 
     public static long parseDuration(String duration) {
+        if (duration == null) return 0;
         Matcher matcher = DurationPattern.matcher(duration);
         if (!matcher.find()) return 0;
         long hour = Long.parseLong(matcher.group(1));
@@ -57,9 +58,17 @@ public class FFmpegUtils {
         return Utils.ObjectMapper.readValue(out.toByteArray(), MediaInfo.class);
     }
 
+    /**
+     * 视频截图。先用输入模式 seek（快），失败后降级为输出模式 seek（慢但兼容 MPEG-TS 等格式）
+     */
     public static void snapshot(File video, String position, File snapshot) throws Exception {
+        // 输入模式 seek：-ss 在 -i 前
         String cmd = FFmpegExe + " -hide_banner -y -ss " + position + " -i \"" + video.getAbsolutePath() + "\" -vframes 1 \"" + snapshot.getAbsolutePath() + "\"";
         exec(cmd, null, null);
+        if (snapshot.exists() && snapshot.length() > 0) return;
+        // 输出模式 seek：-ss 在 -i 后，逐帧解码到目标位置，兼容性更好
+        String cmdSlow = FFmpegExe + " -hide_banner -y -i \"" + video.getAbsolutePath() + "\" -ss " + position + " -vframes 1 \"" + snapshot.getAbsolutePath() + "\"";
+        exec(cmdSlow, null, null);
     }
 
     private static void exec(String cmd, File folder, ByteArrayOutputStream captureOut) throws Exception {
@@ -67,7 +76,9 @@ public class FFmpegUtils {
             File tmpFile = folder == null ? new File("tmp.bat") : new File(folder, "tmp.bat");
             try {
                 String pre = "@echo off\r\n" + "chcp 65001 >nul\r\n";
-                FileUtils.write(tmpFile, pre + cmd, Charset.defaultCharset());
+                // cmd.exe 会把 % 当变量展开，需转义为 %%
+                String safeCmd = cmd.replace("%", "%%");
+                FileUtils.write(tmpFile, pre + safeCmd, Charset.defaultCharset());
                 Process process = Runtime.getRuntime().exec("cmd /c tmp.bat", null, folder);
                 handleProcess(process, captureOut);
             } finally {

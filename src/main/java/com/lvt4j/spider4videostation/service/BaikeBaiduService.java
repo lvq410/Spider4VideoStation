@@ -151,6 +151,7 @@ public class BaikeBaiduService implements SpiderService {
                     movie = movie_loadItem(targetSite, detailUrl);
                 }catch(Throwable e){
                     log.error("error load detail {}", detailUrl, e);
+                    rst.collectError(e);
                     return;
                 }
                 if(movie==null) return;
@@ -175,6 +176,7 @@ public class BaikeBaiduService implements SpiderService {
             if(log.isTraceEnabled()) log.trace("search rst {}", searchCnt);
         }catch(Exception e){
             log.error("error on search {}", searchUrl, e);
+            rst.collectError(e);
             return;
         }
         
@@ -201,6 +203,7 @@ public class BaikeBaiduService implements SpiderService {
                 movie = movie_loadItem(targetSite, detailUrl);
             }catch(Throwable e){
                 log.error("error load detail {}", detailUrl, e);
+                rst.collectError(e);
                 continue;
             }
             
@@ -212,6 +215,7 @@ public class BaikeBaiduService implements SpiderService {
     }
     private Movie movie_loadItem(TargetSite targetSite, String detailUrl) throws Throwable {
         Movie movie = new Movie(targetSite.name);
+        movie.sourceUrl = detailUrl;
         
         log.info("load detail {}", detailUrl);
         Triple<Document, JsonNode, JsonNode> itemPage = loadItemPage(detailUrl, false);
@@ -251,6 +255,7 @@ public class BaikeBaiduService implements SpiderService {
                     tvShow = tvshow_loadItem(targetSite, detailUrl);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
+                    rst.collectError(e);
                     return;
                 }
                 if(tvShow==null) return;
@@ -275,6 +280,7 @@ public class BaikeBaiduService implements SpiderService {
             if(log.isTraceEnabled()) log.trace("search rst {}", searchCnt);
         }catch(Exception e){
             log.error("error on search {}", searchUrl, e);
+            rst.collectError(e);
             return;
         }
         
@@ -301,6 +307,7 @@ public class BaikeBaiduService implements SpiderService {
                 tvShow = tvshow_loadItem(targetSite, detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
+                rst.collectError(e);
                 continue;
             }
             
@@ -312,6 +319,7 @@ public class BaikeBaiduService implements SpiderService {
     }
     private TvShow tvshow_loadItem(TargetSite targetSite, String detailUrl) throws Throwable {
         TvShow tvShow = new TvShow(targetSite.name);
+        tvShow.sourceUrl = detailUrl;
         
         log.info("load detail {}", detailUrl);
         Triple<Document, JsonNode, JsonNode> itemPage = loadItemPage(detailUrl, false);
@@ -345,6 +353,7 @@ public class BaikeBaiduService implements SpiderService {
                     episodes = tvshow_episode_loadItem(targetSite, detailUrl, false, args.input.season, args.input.episode);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
+                    rst.collectError(e);
                     return;
                 }
                 rst.result.addAll(episodes);
@@ -367,6 +376,7 @@ public class BaikeBaiduService implements SpiderService {
             if(log.isTraceEnabled()) log.trace("search rst {}", searchCnt);
         }catch(Exception e){
             log.error("error on search {}", searchUrl, e);
+            rst.collectError(e);
             return;
         }
         
@@ -393,6 +403,7 @@ public class BaikeBaiduService implements SpiderService {
                 episodes = tvshow_episode_loadItem(targetSite, detailUrl, true, args.input.season, args.input.episode);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
+                rst.collectError(e);
                 continue;
             }
             

@@ -132,6 +132,7 @@ public class DoubanService implements SpiderService {
                     movie = movie_loadItem(targetSite,detailUrl);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
+                    rst.collectError(e);
                     return;
                 }
                 if(movie==null) return;
@@ -150,6 +151,7 @@ public class DoubanService implements SpiderService {
             if(log.isTraceEnabled()) log.trace("search rst {}", searchCnt);
         }catch(Exception e){
             log.error("error on search {}", searchUrl, e);
+            rst.collectError(e);
             return;
         }
         
@@ -193,6 +195,7 @@ public class DoubanService implements SpiderService {
                 movie = movie_loadItem(targetSite,detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
+                rst.collectError(e);
                 continue;
             }
             
@@ -216,6 +219,7 @@ public class DoubanService implements SpiderService {
     }
     private Movie movie_loadItem(TargetSite targetSite, String detailUrl) {
         Movie movie = new Movie(targetSite.name);
+        movie.sourceUrl = detailUrl;
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);
@@ -332,6 +336,7 @@ public class DoubanService implements SpiderService {
                     tvShow = tvshow_loadItem(targetSite,detailUrl);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
+                    rst.collectError(e);
                     return;
                 }
                 if(tvShow==null) return;
@@ -350,6 +355,7 @@ public class DoubanService implements SpiderService {
             if(log.isTraceEnabled()) log.trace("search rst {}", searchCnt);
         }catch(Exception e){
             log.error("error on search {}", searchUrl, e);
+            rst.collectError(e);
             return;
         }
         
@@ -393,6 +399,7 @@ public class DoubanService implements SpiderService {
                 tvShow = tvshow_loadItem(targetSite,detailUrl);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
+                rst.collectError(e);
                 continue;
             }
             
@@ -400,6 +407,7 @@ public class DoubanService implements SpiderService {
                 if(StringUtils.isNotBlank(title) && StringUtils.isNotBlank(coverUrl)){ //但列表上有点数据
                     //用列表上的数据
                     tvShow = new TvShow(targetSite.name);
+                    tvShow.sourceUrl = detailUrl;
                     if(StringUtils.isNotBlank(title)) tvShow.title = title;
                     if(StringUtils.isNotBlank(coverUrl)) {
                         tvShow.extra().poster.add(0, coverUrl);
@@ -416,6 +424,7 @@ public class DoubanService implements SpiderService {
     }
     private TvShow tvshow_loadItem(TargetSite targetSite, String detailUrl) {
         TvShow tvShow = new TvShow(targetSite.name);
+        tvShow.sourceUrl = detailUrl;
         
         log.info("load detail {}", detailUrl);
         String detailCnt = loadPage(detailUrl);
@@ -491,6 +500,7 @@ public class DoubanService implements SpiderService {
                     episodes = tvshow_episode_loadItem(targetSite,detailUrl, args.input.season, args.input.episode, null);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
+                    rst.collectError(e);
                     return;
                 }
                 rst.result.addAll(episodes);
@@ -506,6 +516,7 @@ public class DoubanService implements SpiderService {
                     episodes = tvshow_episode_loadItem(targetSite,detailUrl, args.input.season, args.input.episode, episodeUrl);
                 }catch(Exception e){
                     log.error("error load detail {}", detailUrl, e);
+                    rst.collectError(e);
                     return;
                 }
                 rst.result.addAll(episodes);
@@ -522,6 +533,7 @@ public class DoubanService implements SpiderService {
             if(log.isTraceEnabled()) log.trace("search rst {}", searchCnt);
         }catch(Exception e){
             log.error("error on search {}", searchUrl, e);
+            rst.collectError(e);
             return;
         }
         
@@ -565,6 +577,7 @@ public class DoubanService implements SpiderService {
                 episodes = tvshow_episode_loadItem(targetSite,detailUrl, args.input.season, args.input.episode, null);
             }catch(Exception e){
                 log.error("error load detail {}", detailUrl, e);
+                rst.collectError(e);
                 continue;
             }
             

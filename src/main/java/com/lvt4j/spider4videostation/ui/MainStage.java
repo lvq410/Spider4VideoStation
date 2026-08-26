@@ -117,6 +117,7 @@ public class MainStage {
     private JButton pickerBtn;
     private JButton cleanCacheBtn;
     private JButton doubanLoginBtn;
+    private JButton javdbFetchBtn;
     private JButton metaViewerBtn;
     private final List<JButton> settingButtons = new ArrayList<>();
 
@@ -330,7 +331,27 @@ public class MainStage {
 
         int row = 0;
         row = addSettingRow(panel, gbc, row, "WebDriver地址", webDriverAddrTf = new JTextField(25));
-        row = addSettingRow(panel, gbc, row, "Javdb地址", javdbOriginTf = new JTextField(25));
+        // Javdb地址 - 输入框右侧紧跟"获取"按钮，共同占 column 1，不额外增加列
+        gbc.gridx = 0; gbc.gridy = row;
+        gbc.weightx = 0; gbc.fill = GridBagConstraints.NONE;
+        panel.add(new JLabel("Javdb地址:"), gbc);
+        gbc.gridx = 1;
+        gbc.weightx = 1.0; gbc.fill = GridBagConstraints.HORIZONTAL;
+        JPanel javdbInputPanel = new JPanel(new BorderLayout(2, 0));
+        javdbOriginTf = new JTextField(18);
+        javdbInputPanel.add(javdbOriginTf, BorderLayout.CENTER);
+        javdbFetchBtn = new JButton("获取");
+        javdbFetchBtn.addActionListener(e -> fetchJavdbLatestAddress());
+        settingButtons.add(javdbFetchBtn);
+        javdbInputPanel.add(javdbFetchBtn, BorderLayout.EAST);
+        panel.add(javdbInputPanel, gbc);
+        gbc.gridx = 2;
+        gbc.weightx = 0; gbc.fill = GridBagConstraints.NONE;
+        JButton javdbSetBtn = new JButton("设置");
+        javdbSetBtn.addActionListener(e -> setProperty("Javdb地址", javdbOriginTf));
+        settingButtons.add(javdbSetBtn);
+        panel.add(javdbSetBtn, gbc);
+        row++;
         row = addSettingRow(panel, gbc, row, "视频集号偏移量", fileEpOffsetTf = new JTextField(10));
         row = addSettingRow(panel, gbc, row, "源站集号偏移量", siteEpOffsetTf = new JTextField(10));
         row = addSettingRow(panel, gbc, row, "强制发布日期", originalAvailableTf = new JTextField(10));
@@ -406,12 +427,9 @@ public class MainStage {
         JButton vsUnregScanBtn = new JButton("VS未注册视频扫描");
         vsUnregScanBtn.addActionListener(e -> openVSUnregisteredScan());
         row2.add(vsUnregScanBtn);
-        JButton vsMetaCompleteBtn = new JButton("VS追加剧集meta补全");
-        vsMetaCompleteBtn.addActionListener(e -> openVSmetaCompleter());
-        row2.add(vsMetaCompleteBtn);
-        JButton vsThumbRefreshBtn = new JButton("VS剧集缩略图重刷");
-        vsThumbRefreshBtn.addActionListener(e -> openVSThumbRefresh());
-        row2.add(vsThumbRefreshBtn);
+        JButton vsMaintenanceBtn = new JButton("VS剧集元数据维护");
+        vsMaintenanceBtn.addActionListener(e -> openVSmetaMaintenance());
+        row2.add(vsMaintenanceBtn);
 
         contentPanel.add(row1);
         contentPanel.add(sepPanel);
@@ -1183,6 +1201,11 @@ public class MainStage {
                     statusLb.setText("搜索完成");
                     if (!lastResults.isEmpty()) resultTitleList.setSelectedIndex(0);
                     updateApplyButtons();
+                    // 搜索过程中遇到的已知错误弹窗提醒
+                    if (!rst.errors.isEmpty()) {
+                        String errMsg = String.join("\n", rst.errors);
+                        JOptionPane.showMessageDialog(frame, errMsg, "搜索提示", JOptionPane.WARNING_MESSAGE);
+                    }
                 } catch (Exception e) {
                     resultRawTa.setText("搜索失败: " + e.getMessage());
                     statusLb.setText("搜索失败");
@@ -1347,23 +1370,13 @@ public class MainStage {
         dialog.setVisible(true);
     }
 
-    private void openVSmetaCompleter() {
+    private void openVSmetaMaintenance() {
         String targetPath = getTargetPath();
         if (targetPath.isEmpty()) {
             JOptionPane.showMessageDialog(frame, "请先在主界面选择抓取目标", "提示", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        VSmetaCompleterDialog dialog = new VSmetaCompleterDialog(frame, configService, targetPath);
-        dialog.setVisible(true);
-    }
-
-    private void openVSThumbRefresh() {
-        String targetPath = getTargetPath();
-        if (targetPath.isEmpty()) {
-            JOptionPane.showMessageDialog(frame, "请先在主界面选择抓取目标", "提示", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        VSThumbRefreshDialog dialog = new VSThumbRefreshDialog(frame, configService, targetPath);
+        VSmetaMaintenanceDialog dialog = new VSmetaMaintenanceDialog(frame, configService, targetPath);
         dialog.setVisible(true);
     }
 
@@ -1623,8 +1636,15 @@ public class MainStage {
                     if (Utils.isUrl(keyword)) {
                         showTitle = keyword;
                     } else {
+                        // 优先使用 sourceUrl 精确定位，避免按标题重搜时命中不同结果
                         JsonNode selNode = Utils.ObjectMapper.valueToTree(lastResults.get(selectedIdx));
-                        showTitle = selNode.get("title").asText();
+                        JsonNode sourceUrlNode = selNode.get("sourceUrl");
+                        if (sourceUrlNode != null && !sourceUrlNode.isNull()
+                                && !sourceUrlNode.asText().isEmpty()) {
+                            showTitle = sourceUrlNode.asText();
+                        } else {
+                            showTitle = selNode.get("title").asText();
+                        }
                     }
                     String lang = (String) langCb.getSelectedItem();
                     TargetSite ts = findTargetSite();
@@ -1785,5 +1805,118 @@ public class MainStage {
         } else {
             statusLb.setText("重命名失败");
         }
+    }
+
+    /**
+     * 调用 JavDB App API 获取最新网站地址
+     * 签名算法和常量来自 javdb-hack 项目对 JavDB Android App 的逆向分析
+     * jdsignature = timestamp.nonce.md5(timestamp + secret)
+     */
+    private void fetchJavdbLatestAddress() {
+        javdbFetchBtn.setEnabled(false);
+        javdbFetchBtn.setText("获取中...");
+
+        new SwingWorker<String, Void>() {
+            @Override
+            protected String doInBackground() throws Exception {
+                // 签名常量 (从 JavDB App 逆向破解，对所有用户相同)
+                String nonce = "lpw6vgqzsp";
+                String secret = "71cf27bb3c0bcdf207b64abecddc970098c7421ee7203b9cdae54478478a199e"
+                    + "7d5a6e1a57691123c1a931c057842fb73ba3b3c83bcd69c17ccf174081e3d8aa";
+
+                // 生成 jdsignature: timestamp.nonce.md5(timestamp+secret)
+                String ts = String.valueOf(System.currentTimeMillis() / 1000);
+                java.security.MessageDigest md5 = java.security.MessageDigest.getInstance("MD5");
+                byte[] digest = md5.digest((ts + secret).getBytes("UTF-8"));
+                StringBuilder sb = new StringBuilder();
+                for (byte b : digest) sb.append(String.format("%02x", b & 0xff));
+                String signature = ts + "." + nonce + "." + sb.toString();
+
+                // API 域名轮换列表 (从 data.txt 解密 / DNS 抓包获取)
+                String[] domains = {"apidd.spthgb.com", "apidd.czssdgz.com", "api.ffaoa.com", "jdforrepam.com"};
+                String path = "/api/v1/startup?platform=android&app_channel=official"
+                    + "&app_version=official&app_version_number=1.9.35";
+
+                Exception lastErr = null;
+                for (String domain : domains) {
+                    try {
+                        String body = Jsoup.connect("https://" + domain + path)
+                            .header("jdsignature", signature)
+                            .userAgent("Dart/3.5 (dart:io)")
+                            .ignoreContentType(true)
+                            .timeout(8000)
+                            .execute()
+                            .body();
+
+                        JsonNode resp = Utils.ObjectMapper.readTree(body);
+                        if (resp.path("success").asInt() != 1) continue;
+
+                        return resp.path("data").path("settings").path("NOTICE").asText("");
+                    } catch (Exception e) {
+                        lastErr = e;
+                    }
+                }
+                throw new RuntimeException("所有API域名都失败"
+                    + (lastErr != null ? ": " + lastErr.getMessage() : ""));
+            }
+
+            @Override
+            protected void done() {
+                javdbFetchBtn.setEnabled(true);
+                javdbFetchBtn.setText("获取");
+                try {
+                    String notice = get();
+                    List<String> urls = new ArrayList<>();
+                    // 从"網站域名"区域提取 href URL（截取到"App安裝域名"之前，排除 App 和 t.me）
+                    String siteSection = notice.contains("App安裝域名")
+                        ? notice.substring(0, notice.indexOf("App安裝域名")) : notice;
+                    java.util.regex.Matcher m = java.util.regex.Pattern
+                        .compile("href=\"(https?://[^\"]+)\"")
+                        .matcher(siteSection);
+                    while (m.find()) {
+                        String url = m.group(1);
+                        String host = url.replaceFirst("https?://", "").replaceFirst("/.*", "");
+                        if (host.contains("t.me")) continue;
+                        if (!urls.contains(url)) urls.add(url);
+                    }
+                    // 从"其他可用網域"区域提取纯文本域名（每行一个）
+                    int otherIdx = notice.indexOf("其他可用網域");
+                    if (otherIdx >= 0) {
+                        String otherSection = notice.substring(otherIdx);
+                        for (String line : otherSection.split("[\\r\\n]+")) {
+                            String d = line.trim();
+                            if (d.matches("[\\w.-]+\\.[a-z]{2,}")) {
+                                String url = "https://" + d;
+                                if (!urls.contains(url)) urls.add(url);
+                            }
+                        }
+                    }
+                    if (!urls.isEmpty()) {
+                        // 解析成功：下拉选择
+                        JComboBox<String> combo = new JComboBox<>(urls.toArray(new String[0]));
+                        combo.setEditable(false);
+                        int choice = JOptionPane.showConfirmDialog(frame,
+                            new Object[]{"选择Javdb地址:", combo}, "Javdb地址",
+                            JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE);
+                        if (choice == JOptionPane.OK_OPTION) {
+                            javdbOriginTf.setText((String) combo.getSelectedItem());
+                        }
+                    } else {
+                        // 解析失败：展示原始公告，可选中复制
+                        JTextArea ta = new JTextArea(notice, 4, 35);
+                        ta.setEditable(false);
+                        ta.setLineWrap(true);
+                        ta.setWrapStyleWord(true);
+                        JOptionPane.showMessageDialog(frame,
+                            new Object[]{"无法解析地址，原始公告:", new JScrollPane(ta)},
+                            "Javdb地址", JOptionPane.WARNING_MESSAGE);
+                    }
+                } catch (Exception e) {
+                    String msg = e.getCause() != null ? e.getCause().getMessage() : e.getMessage();
+                    JOptionPane.showMessageDialog(frame,
+                        "获取失败: " + msg, "Javdb地址", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 }

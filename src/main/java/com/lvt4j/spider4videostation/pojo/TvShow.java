@@ -27,6 +27,9 @@ public class TvShow implements Serializable {
     public String title = EMPTY;
     public String original_available = EMPTY;
     public String summary = EMPTY;
+
+    /** 搜索结果来源页面的 URL，用于批量生成时精确定位同一条目 */
+    public String sourceUrl = EMPTY;
     
     public Map<String, Extra> extra;
     

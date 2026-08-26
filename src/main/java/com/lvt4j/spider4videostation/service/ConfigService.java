@@ -55,28 +55,13 @@ public class ConfigService {
                 if (val == null) val = env.getProperty(key);
                 if (val != null) sb.append(key).append(": ").append(val).append('\n');
             }
-            // 最近抓取目标
-            String recentTargets = System.getProperty("recentTargets");
-            if (recentTargets == null) recentTargets = env.getProperty("recentTargets");
-            if (recentTargets != null) sb.append("recentTargets: '").append(recentTargets.replace("'", "''")).append("'\n");
-            // 最近DSM路径
-            String recentDsmPaths = System.getProperty("recentDsmPaths");
-            if (recentDsmPaths == null) recentDsmPaths = env.getProperty("recentDsmPaths");
-            if (recentDsmPaths != null) sb.append("recentDsmPaths: '").append(recentDsmPaths.replace("'", "''")).append("'\n");
-            // meta补全历史
-            String recentMetaCompleteTargets = System.getProperty("recentMetaCompleteTargets");
-            if (recentMetaCompleteTargets == null) recentMetaCompleteTargets = env.getProperty("recentMetaCompleteTargets");
-            if (recentMetaCompleteTargets != null) sb.append("recentMetaCompleteTargets: '").append(recentMetaCompleteTargets.replace("'", "''")).append("'\n");
-            String recentMetaCompleteTempFolders = System.getProperty("recentMetaCompleteTempFolders");
-            if (recentMetaCompleteTempFolders == null) recentMetaCompleteTempFolders = env.getProperty("recentMetaCompleteTempFolders");
-            if (recentMetaCompleteTempFolders != null) sb.append("recentMetaCompleteTempFolders: '").append(recentMetaCompleteTempFolders.replace("'", "''")).append("'\n");
-            // 缩略图重刷历史
-            String recentThumbTargets = System.getProperty("recentThumbTargets");
-            if (recentThumbTargets == null) recentThumbTargets = env.getProperty("recentThumbTargets");
-            if (recentThumbTargets != null) sb.append("recentThumbTargets: '").append(recentThumbTargets.replace("'", "''")).append("'\n");
-            String recentThumbTempFolders = System.getProperty("recentThumbTempFolders");
-            if (recentThumbTempFolders == null) recentThumbTempFolders = env.getProperty("recentThumbTempFolders");
-            if (recentThumbTempFolders != null) sb.append("recentThumbTempFolders: '").append(recentThumbTempFolders.replace("'", "''")).append("'\n");
+            // JSON值类配置（单引号包裹防止YAML特殊字符冲突）
+            persistJsonKey(sb, "recentTargets");
+            persistJsonKey(sb, "recentDsmPaths");
+            // 元数据维护相关
+            persistJsonKey(sb, "recentMaintenanceTargets");
+            persistJsonKey(sb, "recentMaintenanceTempFolders");
+            persistJsonKey(sb, "maintenanceTargetFolders");
             try (OutputStreamWriter w = new OutputStreamWriter(
                     new FileOutputStream(LocalConfigFile), StandardCharsets.UTF_8)) {
                 w.write(sb.toString());
@@ -85,5 +70,12 @@ public class ConfigService {
         } catch (Exception e) {
             log.warn("persist settings fail: {}", e.getMessage());
         }
+    }
+
+    /** 持久化单个JSON值类配置key，单引号包裹并转义内部单引号 */
+    private void persistJsonKey(StringBuilder sb, String key) {
+        String val = System.getProperty(key);
+        if (val == null) val = env.getProperty(key);
+        if (val != null) sb.append(key).append(": '").append(val.replace("'", "''")).append("'\n");
     }
 }

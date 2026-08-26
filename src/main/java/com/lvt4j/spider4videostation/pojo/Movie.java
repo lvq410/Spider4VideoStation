@@ -33,6 +33,9 @@ public class Movie {
     public String tagline = EMPTY;
     public String original_available = EMPTY;
     public String summary = EMPTY;
+
+    /** 搜索结果来源页面的 URL */
+    public String sourceUrl = EMPTY;
     public List<String> genre = new ArrayList<>();
     public String certificate = EMPTY;
     public List<String> actor = new ArrayList<>();
